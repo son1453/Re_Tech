@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LubriCore · Realtime Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LubriCore · Login</title>
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,7 +13,7 @@
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
-        /* ===== CUSTOM STYLE (hanya untuk animasi & kustomisasi yang tidak tersedia di Tailwind) ===== */
+        /* ===== CUSTOM STYLE ===== */
         @keyframes pulse-dot {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.85); }
@@ -22,6 +22,16 @@
         @keyframes slideIn {
             from { opacity: 0; transform: translateX(-10px); }
             to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .status-dot {
@@ -38,6 +48,20 @@
             animation: slideIn 0.3s ease;
         }
 
+        .login-container {
+            animation: fadeIn 0.5s ease;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top: 2px solid #00c8a0;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
         .alarm-list::-webkit-scrollbar {
             width: 3px;
         }
@@ -51,10 +75,16 @@
 
         .device-item {
             transition: all 0.3s ease;
+            cursor: pointer;
         }
 
         .device-item:hover {
             background: rgba(255, 255, 255, 0.08);
+        }
+
+        .device-item.active {
+            background: rgba(255, 255, 255, 0.12);
+            border-left-color: #0088ff !important;
         }
 
         .kpi-card {
@@ -99,7 +129,54 @@
 </head>
 <body>
 
-    <div class="bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] h-screen w-screen overflow-hidden flex justify-center items-center p-2">
+    <!-- ============================================================ -->
+    <!-- ===== LAYAR LOGIN ===== -->
+    <!-- ============================================================ -->
+    <div id="loginScreen" class="bg-[#0b0e14] h-screen w-screen overflow-hidden flex justify-center items-center">
+        <div class="login-container max-w-md w-full mx-4 p-8 bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] border border-white/5">
+
+            <!-- Logo -->
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-16 h-16 bg-gradient-to-br from-[#00c8a0] to-[#0088ff] rounded-2xl flex items-center justify-center text-3xl text-white shadow-[0_4px_20px_rgba(0,136,255,0.3)] mb-4">
+                    ⚙
+                </div>
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-[#e8edf5] to-[#a0b8d4] bg-clip-text text-transparent">LubriCore</h1>
+                <p class="text-[#6b7d9c] text-sm mt-1">Sistem Monitoring Pelumas · IIoT</p>
+            </div>
+
+            <!-- Form Login -->
+            <form id="loginForm" class="space-y-4" onsubmit="handleLogin(event)">
+                <div>
+                    <label class="block text-[#8da0c0] text-sm font-medium mb-1.5">Username</label>
+                    <input type="text" id="usernameInput" value="admin" 
+                           class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0] transition-colors placeholder:text-[#4a5a7a]"
+                           placeholder="Masukkan username" required />
+                </div>
+                <div>
+                    <label class="block text-[#8da0c0] text-sm font-medium mb-1.5">Password</label>
+                    <input type="password" id="passwordInput" value="admin123" 
+                           class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0] transition-colors placeholder:text-[#4a5a7a]"
+                           placeholder="Masukkan password" required />
+                </div>
+                <div id="loginError" class="text-[#ff6b6b] text-sm hidden">❌ Username atau password salah!</div>
+                <button type="submit" 
+                        class="w-full py-2.5 bg-gradient-to-r from-[#00c8a0] to-[#0088ff] rounded-xl text-white font-semibold text-sm hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(0,136,255,0.3)]">
+                    <span id="loginBtnText">🔐 Masuk Dashboard</span>
+                    <span id="loginBtnLoading" class="hidden"><span class="spinner mr-2"></span> Memproses...</span>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <p class="text-[#4a5a7a] text-xs">Default: admin / admin123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ===== DASHBOARD (disembunyikan awalnya) ===== -->
+    <!-- ============================================================ -->
+    <div id="dashboardScreen" class="hidden bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] h-screen w-screen overflow-hidden flex justify-center items-center p-2">
+
         <div class="max-w-[1440px] w-full h-full max-h-[98vh] bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-[24px] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col gap-3 overflow-hidden">
 
             <!-- ===== HEADER ===== -->
@@ -119,6 +196,10 @@
                     <span id="mqttStatus" class="mqtt-status disconnected text-[11px] px-3 py-0.5 rounded-[30px] border">⏳ Menghubungkan...</span>
                     <span id="alarmBadge" class="badge-alarm px-3 py-0.5 rounded-[30px] text-xs border">🔔 0 Alarm</span>
                     <span id="clockDisplay" class="text-xs text-[#6b7d9c]">--:--:--</span>
+                    <button onclick="handleLogout()" 
+                            class="text-[11px] px-3 py-0.5 rounded-[30px] border border-white/10 text-[#6b7d9c] hover:text-[#ff6b6b] hover:border-[#ff6b6b]/30 transition-all">
+                        🚪 Logout
+                    </button>
                 </div>
             </div>
 
@@ -221,12 +302,109 @@
         </div>
     </div>
 
-    <!-- ===== SCRIPT (SAMA PERSIS DENGAN ASLINYA) ===== -->
+    <!-- ============================================================ -->
+    <!-- ===== SCRIPT ===== -->
+    <!-- ============================================================ -->
     <script>
+        // ==========================================
+        //  SISTEM LOGIN
+        // ==========================================
+
+        // Kredensial default (bisa diganti)
+        const VALID_USERNAME = 'admin';
+        const VALID_PASSWORD = 'admin123';
+
+        // Cek apakah sudah login sebelumnya (session via localStorage)
+        function checkSession() {
+            const isLoggedIn = localStorage.getItem('lubricore_logged_in');
+            if (isLoggedIn === 'true') {
+                showDashboard();
+                return true;
+            }
+            return false;
+        }
+
+        // Handle login form submit
+        function handleLogin(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('usernameInput').value.trim();
+            const password = document.getElementById('passwordInput').value.trim();
+            const errorEl = document.getElementById('loginError');
+            const btnText = document.getElementById('loginBtnText');
+            const btnLoading = document.getElementById('loginBtnLoading');
+
+            // Validasi sederhana
+            if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+                // Simpan session
+                localStorage.setItem('lubricore_logged_in', 'true');
+
+                // Tampilkan loading
+                btnText.classList.add('hidden');
+                btnLoading.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+
+                setTimeout(() => {
+                    showDashboard();
+                    initDashboard();
+                }, 500);
+
+            } else {
+                // Tampilkan error
+                errorEl.classList.remove('hidden');
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
+
+                // Animasi shake (opsional)
+                errorEl.style.animation = 'none';
+                setTimeout(() => {
+                    errorEl.style.animation = 'slideIn 0.3s ease';
+                }, 10);
+            }
+        }
+
+        // Show dashboard, hide login
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboardScreen').classList.remove('hidden');
+        }
+
+        // Show login, hide dashboard
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboardScreen').classList.add('hidden');
+        }
+
+        // Handle logout
+        function handleLogout() {
+            localStorage.removeItem('lubricore_logged_in');
+            // Hentikan semua interval
+            if (dummyInterval) {
+                clearInterval(dummyInterval);
+                dummyInterval = null;
+            }
+            showLogin();
+            // Reset state
+            deviceData = {};
+            alarmLog = [];
+            selectedDeviceId = null;
+            if (chartData) {
+                chartData.labels = [];
+                chartData.viskositas = [];
+                chartData.suhu = [];
+            }
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+            // Reload page agar clean
+            location.reload();
+        }
+
         // ==========================================
         //  KONFIGURASI MQTT
         // ==========================================
-        const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+        const MQTT_BROKER = 'wss://test.mosquitto.org:8081/mqtt';
         const MQTT_TOPIC = 'lubrikasi/sensor/data';
         const MQTT_CLIENT_ID = 'dashboard_' + Math.random().toString(16).substr(2, 6);
 
@@ -242,6 +420,7 @@
         };
         let chartInstance = null;
         let dummyInterval = null;
+        let selectedDeviceId = null;
 
         // ==========================================
         //  DOM REFS
@@ -252,14 +431,33 @@
         const mqttStatus = $('mqttStatus');
 
         // ==========================================
+        //  INISIALISASI DASHBOARD (dipanggil setelah login)
+        // ==========================================
+        function initDashboard() {
+            initChart();
+            connectMQTT();
+
+            setTimeout(() => {
+                if (Object.keys(deviceData).length === 0) {
+                    console.log('⚠️ Tidak ada data dari MQTT, aktifkan dummy generator');
+                    if (!dummyInterval) {
+                        dummyInterval = setInterval(generateDummyData, 3000);
+                    }
+                }
+            }, 10000);
+
+            // Jalankan clock
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        // ==========================================
         //  CLOCK
         // ==========================================
         function updateClock() {
             const now = new Date();
             $('clockDisplay').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
         }
-        setInterval(updateClock, 1000);
-        updateClock();
 
         // ==========================================
         //  INISIALISASI CHART
@@ -368,16 +566,17 @@
 
             deviceGrid.innerHTML = devices.map(d => {
                 const statusClass = d.status || 'gray';
-                const tempDisplay = d.suhu ? d.suhu.toFixed(1) + '°C' : '--';
+                const tempDisplay = d.suhu ? d.suhu.toFixed(2) + '°C' : '--';
                 const statusText = {
                     'normal': '✅ Normal',
                     'peringatan': '⚠️ Peringatan',
                     'kritis': '🔴 Kritis',
                     'gray': '⏳ Offline'
                 } [statusClass] || '--';
+                const isActive = selectedDeviceId === d.device_id ? 'active' : '';
 
                 return `
-                    <div class="device-item bg-white/5 rounded-[10px] px-[6px] py-2 text-center border-l-4 border-[#4a5a7a] flex flex-col justify-center status-${statusClass}" onclick="selectDevice('${d.device_id}')">
+                    <div class="device-item bg-white/5 rounded-[10px] px-[6px] py-2 text-center border-l-4 border-[#4a5a7a] flex flex-col justify-center status-${statusClass} ${isActive}" onclick="selectDevice('${d.device_id}')">
                         <div class="dev-name text-[10px] font-medium text-[#b0c4e0]">${d.device_name || 'Device'}</div>
                         <div class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</div>
                         <div class="dev-status text-[8px] text-[#6b7d9c] mt-0.5">${statusText}</div>
@@ -467,6 +666,16 @@
             const d = deviceData[deviceId];
             if (!d) return;
 
+            selectedDeviceId = deviceId;
+
+            document.querySelectorAll('.device-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            const activeItem = document.querySelector(`.device-item[onclick="selectDevice('${deviceId}')"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
+
             $('detailDeviceName').textContent = d.device_name || 'Device ' + deviceId;
 
             const statusMap = {
@@ -486,7 +695,13 @@
 
             const setDetail = (id, val, unit = '') => {
                 const el = $(id);
-                if (el) el.textContent = val !== undefined ? val + unit : '--';
+                if (el) {
+                    if (val !== undefined && val !== null && !isNaN(val)) {
+                        el.textContent = val.toFixed(2) + unit;
+                    } else {
+                        el.textContent = '--';
+                    }
+                }
             };
 
             setDetail('dViskositas', d.viskositas, ' cSt');
@@ -526,6 +741,8 @@
                 else rekomendasi = '⚠️ Periksa parameter yang menyimpang.';
             }
             $('dRekomendasi').textContent = '💡 ' + rekomendasi;
+
+            renderDevices();
         }
 
         // ==========================================
@@ -563,15 +780,15 @@
                     alarmLog.unshift({
                         time: timeStr,
                         level: 'critical',
-                        message: `🔴 KRITIS: ${d.device_name} - Getaran ${d.getaran} mm/s, Suhu ${d.suhu}°C`,
+                        message: `🔴 KRITIS: ${d.device_name} - Getaran ${d.getaran.toFixed(2)} mm/s, Suhu ${d.suhu.toFixed(2)}°C`,
                         device: d.device_name
                     });
                 } else if (d.status === 'peringatan') {
                     let msg = `⚠️ Peringatan: ${d.device_name} - `;
-                    if (d.getaran > 5) msg += `Getaran ${d.getaran} mm/s`;
-                    else if (d.suhu > 90) msg += `Suhu ${d.suhu}°C`;
-                    else if (d.kadar_air > 0.2) msg += `Kadar air ${d.kadar_air}%`;
-                    else if (d.level_oli < 40) msg += `Level oli ${d.level_oli}%`;
+                    if (d.getaran > 5) msg += `Getaran ${d.getaran.toFixed(2)} mm/s`;
+                    else if (d.suhu > 90) msg += `Suhu ${d.suhu.toFixed(2)}°C`;
+                    else if (d.kadar_air > 0.2) msg += `Kadar air ${d.kadar_air.toFixed(2)}%`;
+                    else if (d.level_oli < 40) msg += `Level oli ${d.level_oli.toFixed(2)}%`;
                     else msg += `Parameter abnormal`;
                     alarmLog.unshift({ time: timeStr, level: 'warning-item', message: msg, device: d.device_name });
                 }
@@ -583,7 +800,11 @@
                 updateKPI();
 
                 const firstDevice = Object.values(deviceData)[0];
-                if (firstDevice && !document.querySelector('.device-item.active')) {
+                if (firstDevice && !selectedDeviceId) {
+                    selectDevice(firstDevice.device_id);
+                } else if (selectedDeviceId && deviceData[selectedDeviceId]) {
+                    selectDevice(selectedDeviceId);
+                } else if (firstDevice) {
                     selectDevice(firstDevice.device_id);
                 }
 
@@ -608,7 +829,7 @@
             });
 
             client.on('connect', () => {
-                console.log('✅ MQTT Terhubung!');
+                console.log('✅ MQTT Terhubung ke test.mosquitto.org!');
                 mqttStatus.textContent = '✅ Terhubung';
                 mqttStatus.className = 'mqtt-status text-[11px] px-[14px] py-1 rounded-[30px] border';
                 client.subscribe(MQTT_TOPIC, (err) => {
@@ -660,20 +881,17 @@
         }
 
         // ==========================================
-        //  INIT
+        //  INIT - Cek Session saat load
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            initChart();
-            connectMQTT();
-
-            setTimeout(() => {
-                if (Object.keys(deviceData).length === 0) {
-                    console.log('⚠️ Tidak ada data dari MQTT, aktifkan dummy generator');
-                    if (!dummyInterval) {
-                        dummyInterval = setInterval(generateDummyData, 1000);
-                    }
-                }
-            }, 10000);
+            // Cek apakah sudah login
+            const isLoggedIn = localStorage.getItem('lubricore_logged_in');
+            if (isLoggedIn === 'true') {
+                showDashboard();
+                initDashboard();
+            } else {
+                showLogin();
+            }
         });
     </script>
 
