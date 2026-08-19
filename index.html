@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LubriCore · Realtime Dashboard</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- MQTT over WebSocket -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        /* ===== CUSTOM STYLE (hanya untuk animasi & kustomisasi yang tidak tersedia di Tailwind) ===== */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #00e676;
+            border-radius: 50%;
+            box-shadow: 0 0 12px #00e67666;
+            animation: pulse-dot 2s infinite;
+        }
+
+        .alarm-item {
+            animation: slideIn 0.3s ease;
+        }
+
+        .alarm-list::-webkit-scrollbar {
+            width: 3px;
+        }
+        .alarm-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .alarm-list::-webkit-scrollbar-thumb {
+            background: #2a3a5a;
+            border-radius: 10px;
+        }
+
+        .device-item {
+            transition: all 0.3s ease;
+        }
+
+        .device-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .kpi-card {
+            transition: all 0.2s ease;
+        }
+
+        .kpi-card:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .status-green { border-left-color: #00e676; }
+        .status-yellow { border-left-color: #ffd54f; }
+        .status-red { border-left-color: #ff6b6b; background: rgba(255, 80, 80, 0.06); }
+        .status-gray { border-left-color: #4a5a7a; opacity: 0.5; }
+
+        .mqtt-status {
+            background: rgba(0, 230, 118, 0.12);
+            color: #00e676;
+            border: 1px solid rgba(0, 230, 118, 0.15);
+        }
+
+        .mqtt-status.disconnected {
+            background: rgba(255, 80, 80, 0.12);
+            color: #ff6b6b;
+            border-color: rgba(255, 80, 80, 0.15);
+        }
+
+        .badge-alarm {
+            background: rgba(255, 200, 0, 0.15);
+            color: #ffd54f;
+            border: 1px solid rgba(255, 200, 0, 0.15);
+        }
+
+        .kpi-card.success .kpi-value { color: #00e676; }
+        .kpi-card.warning .kpi-value { color: #ffd54f; }
+        .kpi-card.danger .kpi-value { color: #ff6b6b; }
+
+        .value.highlight-green { color: #00e676; }
+        .value.highlight-yellow { color: #ffd54f; }
+        .value.highlight-red { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] h-screen w-screen overflow-hidden flex justify-center items-center p-2">
+        <div class="max-w-[1440px] w-full h-full max-h-[98vh] bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-[24px] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col gap-3 overflow-hidden">
+
+            <!-- ===== HEADER ===== -->
+            <div class="flex justify-between items-center flex-shrink-0 pb-2 border-b border-white/5">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-[#00c8a0] to-[#0088ff] rounded-[10px] flex items-center justify-center font-bold text-base text-white shadow-[0_4px_12px_rgba(0,136,255,0.3)]">
+                        ⚙
+                    </div>
+                    <div>
+                        <h1 class="text-[16px] font-semibold bg-gradient-to-r from-[#e8edf5] to-[#a0b8d4] bg-clip-text text-transparent">LubriCore · Realtime</h1>
+                        <span id="deviceCount" class="text-[11px] text-[#6b7d9c]">0 Perangkat Terhubung</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 text-[13px] text-[#8da0c0]">
+                    <span class="flex items-center"><span class="status-dot mr-1.5"></span> Live</span>
+                    <span id="mqttStatus" class="mqtt-status disconnected text-[11px] px-3 py-0.5 rounded-[30px] border">⏳ Menghubungkan...</span>
+                    <span id="alarmBadge" class="badge-alarm px-3 py-0.5 rounded-[30px] text-xs border">🔔 0 Alarm</span>
+                    <span id="clockDisplay" class="text-xs text-[#6b7d9c]">--:--:--</span>
+                </div>
+            </div>
+
+            <!-- ===== KPI GRID ===== -->
+            <div class="grid grid-cols-5 gap-3 flex-shrink-0">
+                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Total Pelumas Tersimpan</div>
+                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiStok">-- <span class="text-xs text-[#6b7d9c]">L</span></div>
+                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiStokSub">⏳ Menunggu data...</div>
+                </div>
+
+                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Kesehatan Rata-rata</div>
+                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiKesehatan">--<span class="text-sm text-[#6b7d9c]">%</span></div>
+                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiKesehatanSub">--</div>
+                </div>
+
+                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5" id="kpiAlarmCard">
+                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Alarm Aktif</div>
+                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiAlarm">0</div>
+                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiAlarmSub">● 0 Kritis · ● 0 Peringatan</div>
+                </div>
+
+                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Penghematan Biaya</div>
+                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiBiaya">Rp --</div>
+                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiBiayaSub">--</div>
+                </div>
+
+                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Rata-rata MTBF</div>
+                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiMtbf">-- <span class="text-xs text-[#6b7d9c]">bln</span></div>
+                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiMtbfSub">--</div>
+                </div>
+            </div>
+
+            <!-- ===== BODY GRID ===== -->
+            <div class="grid grid-cols-5 gap-3 flex-1 min-h-0">
+
+                <!-- KIRI (Col Span 2) -->
+                <div class="col-span-3 flex flex-col gap-3 min-h-0">
+                    <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
+                        <div class="flex justify-between items-center mb-1.5 flex-shrink-0">
+                            <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">📡 Status Perangkat · Live</span>
+                            <div class="flex gap-3 text-[9px]">
+                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#00e676]">Normal</span>
+                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#ffd54f]">Peringatan</span>
+                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#ff6b6b]">Kritis</span>
+                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#4a5a7a]">Offline</span>
+                            </div>
+                        </div>
+                        <div id="deviceGrid" class="grid grid-cols-5 gap-2 flex-1 min-h-0">
+                            <!-- Diisi JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
+                        <div class="text-[10px] text-[#6b7d9c] tracking-[0.5px] font-medium mb-1 flex-shrink-0">📈 Tren Viskositas & Suhu · 60 Detik Terakhir</div>
+                        <div class="flex-1 w-full relative min-h-0">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KANAN (Col Span 3) -->
+                <div class="col-span-2 flex flex-col gap-3 min-h-0">
+                    <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col overflow-hidden">
+                        <div class="flex justify-between items-center mb-1.5 flex-shrink-0">
+                            <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">🚨 Log Alarm · Terbaru</span>
+                            <span id="alarmCount" class="text-[9px] text-[#4a5a7a]">0 alarm</span>
+                        </div>
+                        <div id="alarmList" class="flex flex-col gap-1 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#2a364f_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                            <div class="text-center text-[#4a5a7a] text-xs py-5">Menunggu data dari sensor...</div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-1 flex-shrink-0">
+                            <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">🔧 Detail · <span id="detailDeviceName">--</span></span>
+                            <span id="detailStatus" class="text-[10px] font-normal"></span>
+                        </div>
+                        <div id="detailGrid" class="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 content-center">
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Viskositas</span><span class="value font-medium text-[#e8edf5]" id="dViskositas">--</span></div>
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Suhu Oli</span><span class="value font-medium text-[#e8edf5]" id="dSuhu">--</span></div>
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Getaran</span><span class="value font-medium text-[#e8edf5]" id="dGetaran">--</span></div>
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Kadar Air</span><span class="value font-medium text-[#e8edf5]" id="dKadarAir">--</span></div>
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Level Oli</span><span class="value font-medium text-[#e8edf5]" id="dLevelOli">--</span></div>
+                            <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Tekanan Filter</span><span class="value font-medium text-[#e8edf5]" id="dTekananFilter">--</span></div>
+                        </div>
+                        <div class="pt-1 flex-shrink-0">
+                            <span id="dRekomendasi" class="text-[#ffd54f] text-[10px]">💡 Menunggu data...</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="lastUpdate" class="text-[10px] text-[#4a5a7a] flex-shrink-0">Terakhir update: --</div>
+
+        </div>
+    </div>
+
+    <!-- ===== SCRIPT (SAMA PERSIS DENGAN ASLINYA) ===== -->
+    <script>
+        // ==========================================
+        //  KONFIGURASI MQTT
+        // ==========================================
+        const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+        const MQTT_TOPIC = 'lubrikasi/sensor/data';
+        const MQTT_CLIENT_ID = 'dashboard_' + Math.random().toString(16).substr(2, 6);
+
+        // ==========================================
+        //  STATE
+        // ==========================================
+        let deviceData = {};
+        let alarmLog = [];
+        let chartData = {
+            labels: [],
+            viskositas: [],
+            suhu: []
+        };
+        let chartInstance = null;
+        let dummyInterval = null;
+
+        // ==========================================
+        //  DOM REFS
+        // ==========================================
+        const $ = id => document.getElementById(id);
+        const deviceGrid = $('deviceGrid');
+        const alarmList = $('alarmList');
+        const mqttStatus = $('mqttStatus');
+
+        // ==========================================
+        //  CLOCK
+        // ==========================================
+        function updateClock() {
+            const now = new Date();
+            $('clockDisplay').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ==========================================
+        //  INISIALISASI CHART
+        // ==========================================
+        function initChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Viskositas (cSt)',
+                        data: chartData.viskositas,
+                        borderColor: '#00c8a0',
+                        backgroundColor: 'rgba(0, 200, 160, 0.08)',
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Suhu Oli (°C)',
+                        data: chartData.suhu,
+                        borderColor: '#ff6b6b',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        borderDash: [5, 4],
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#8da0c0',
+                                font: { size: 9, weight: '400' },
+                                boxWidth: 10,
+                                padding: 8
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#4a5a7a', font: { size: 8 }, maxTicksLimit: 12 },
+                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
+                        },
+                        y: {
+                            position: 'left',
+                            min: 30,
+                            max: 55,
+                            ticks: { color: '#4a5a7a', font: { size: 8 } },
+                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
+                            title: { display: true, text: 'cSt', color: '#4a5a7a', font: { size: 8 } }
+                        },
+                        y1: {
+                            position: 'right',
+                            min: 50,
+                            max: 120,
+                            ticks: { color: '#4a5a7a', font: { size: 8 } },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '°C', color: '#4a5a7a', font: { size: 8 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        //  UPDATE CHART
+        // ==========================================
+        function updateChart(viskositas, suhu) {
+            const now = new Date();
+            const label = now.getHours().toString().padStart(2, '0') + ':' +
+                now.getMinutes().toString().padStart(2, '0') + ':' +
+                now.getSeconds().toString().padStart(2, '0');
+
+            chartData.labels.push(label);
+            chartData.viskositas.push(viskositas);
+            chartData.suhu.push(suhu);
+
+            if (chartData.labels.length > 60) {
+                chartData.labels.shift();
+                chartData.viskositas.shift();
+                chartData.suhu.shift();
+            }
+
+            if (chartInstance) {
+                chartInstance.update();
+            }
+        }
+
+        // ==========================================
+        //  RENDER DEVICE GRID
+        // ==========================================
+        function renderDevices() {
+            const devices = Object.values(deviceData);
+            if (devices.length === 0) {
+                deviceGrid.innerHTML =
+                    `<div style="grid-column:1/-1;text-align:center;color:#4a5a7a;font-size:12px;">Menunggu data perangkat...</div>`;
+                return;
+            }
+
+            deviceGrid.innerHTML = devices.map(d => {
+                const statusClass = d.status || 'gray';
+                const tempDisplay = d.suhu ? d.suhu.toFixed(1) + '°C' : '--';
+                const statusText = {
+                    'normal': '✅ Normal',
+                    'peringatan': '⚠️ Peringatan',
+                    'kritis': '🔴 Kritis',
+                    'gray': '⏳ Offline'
+                } [statusClass] || '--';
+
+                return `
+                    <div class="device-item bg-white/5 rounded-[10px] px-[6px] py-2 text-center border-l-4 border-[#4a5a7a] flex flex-col justify-center status-${statusClass}" onclick="selectDevice('${d.device_id}')">
+                        <div class="dev-name text-[10px] font-medium text-[#b0c4e0]">${d.device_name || 'Device'}</div>
+                        <div class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</div>
+                        <div class="dev-status text-[8px] text-[#6b7d9c] mt-0.5">${statusText}</div>
+                    </div>
+                `;
+            }).join('');
+
+            $('deviceCount').textContent = devices.length + ' Perangkat Terhubung';
+        }
+
+        // ==========================================
+        //  RENDER ALARM
+        // ==========================================
+        function renderAlarms() {
+            if (alarmLog.length === 0) {
+                alarmList.innerHTML =
+                    `<div style="text-align:center;color:#4a5a7a;font-size:12px;padding:20px 0;">✅ Semua sistem normal</div>`;
+                $('alarmCount').textContent = '0 alarm';
+                return;
+            }
+
+            const latest = alarmLog.slice(0, 5);
+            alarmList.innerHTML = latest.map(a => `
+                <div class="alarm-item flex items-center gap-2 px-[10px] py-2 bg-white/5 rounded-lg border-l-[3px] border-[#4a5a7a] text-[11px] flex-shrink-0 ${a.level}">
+                    <span class="alarm-time text-[#6b7d9c] text-[9px] min-w-[42px]">${a.time}</span>
+                    <span class="alarm-msg flex-1 text-[#c8d6e8] text-[10px]">${a.message}</span>
+                    <span class="alarm-device font-medium text-[#8da0c0] text-[9px] bg-white/5 px-2 py-0.5 rounded-full">${a.device}</span>
+                </div>
+            `).join('');
+
+            $('alarmCount').textContent = alarmLog.length + ' alarm';
+        }
+
+        // ==========================================
+        //  UPDATE KPI
+        // ==========================================
+        function updateKPI() {
+            const devices = Object.values(deviceData);
+            if (devices.length === 0) return;
+
+            let totalHealth = 0;
+            let totalLevel = 0;
+            let kritis = 0,
+                peringatan = 0;
+
+            devices.forEach(d => {
+                if (d.status === 'normal') totalHealth += 100;
+                else if (d.status === 'peringatan') { totalHealth += 60;
+                    peringatan++; } else if (d.status === 'kritis') { totalHealth += 20;
+                    kritis++; }
+                if (d.level_oli) totalLevel += d.level_oli;
+            });
+
+            const avgHealth = Math.round(totalHealth / devices.length);
+            const avgLevel = Math.round(totalLevel / devices.length);
+
+            $('kpiKesehatan').textContent = avgHealth + '%';
+            $('kpiKesehatanSub').textContent = `📊 ${devices.length} perangkat aktif`;
+
+            $('kpiStok').innerHTML = avgLevel + ' <span style="font-size:14px;color:#6b7d9c;">L</span>';
+            $('kpiStokSub').textContent = `⏳ Rata-rata level ${avgLevel}%`;
+
+            const totalAlarm = kritis + peringatan;
+            $('kpiAlarm').textContent = totalAlarm;
+            $('kpiAlarmSub').textContent = `● ${kritis} Kritis · ● ${peringatan} Peringatan`;
+
+            const card = $('kpiAlarmCard');
+            card.className = 'kpi-card bg-white/5 rounded-[14px] p-[14px_16px] border border-white/5' + (kritis > 0 ? ' danger' : peringatan > 0 ? ' warning' : ' success');
+
+            $('alarmBadge').textContent = `🔔 ${totalAlarm} Alarm`;
+            $('alarmBadge').style.background = totalAlarm > 0 ? 'rgba(255,80,80,0.15)' : 'rgba(255,200,0,0.15)';
+            $('alarmBadge').style.color = totalAlarm > 0 ? '#ff6b6b' : '#ffd54f';
+
+            const savings = (devices.length * 12.5 + Math.random() * 5).toFixed(1);
+            $('kpiBiaya').textContent = 'Rp ' + savings + ' Jt';
+            $('kpiBiayaSub').textContent = `📈 +${(Math.random()*15+5).toFixed(1)}% dari bulan lalu`;
+
+            const mtbf = (10 + devices.length * 0.8 + Math.random() * 3).toFixed(1);
+            $('kpiMtbf').innerHTML = mtbf + ' <span style="font-size:14px;color:#6b7d9c;">bln</span>';
+            $('kpiMtbfSub').textContent = `📈 +${(devices.length*3+10).toFixed(0)}% sejak implementasi`;
+        }
+
+        // ==========================================
+        //  SELECT DEVICE
+        // ==========================================
+        function selectDevice(deviceId) {
+            const d = deviceData[deviceId];
+            if (!d) return;
+
+            $('detailDeviceName').textContent = d.device_name || 'Device ' + deviceId;
+
+            const statusMap = {
+                'normal': '✅ Normal',
+                'peringatan': '⚠️ Peringatan',
+                'kritis': '🔴 KRITIS',
+                'gray': '⏳ Offline'
+            };
+            const statusColor = {
+                'normal': '#00e676',
+                'peringatan': '#ffd54f',
+                'kritis': '#ff6b6b',
+                'gray': '#4a5a7a'
+            };
+            $('detailStatus').textContent = statusMap[d.status] || '--';
+            $('detailStatus').style.color = statusColor[d.status] || '#4a5a7a';
+
+            const setDetail = (id, val, unit = '') => {
+                const el = $(id);
+                if (el) el.textContent = val !== undefined ? val + unit : '--';
+            };
+
+            setDetail('dViskositas', d.viskositas, ' cSt');
+            setDetail('dSuhu', d.suhu, '°C');
+            setDetail('dGetaran', d.getaran, ' mm/s');
+            setDetail('dKadarAir', d.kadar_air, '%');
+            setDetail('dLevelOli', d.level_oli, '%');
+            setDetail('dTekananFilter', d.tekanan_filter, ' bar');
+
+            ['dViskositas', 'dSuhu', 'dGetaran', 'dKadarAir', 'dLevelOli', 'dTekananFilter'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.className = 'value font-medium text-[#e8edf5] transition-all duration-300';
+                    if (id === 'dViskositas' && d.viskositas < 40) el.classList.add('highlight-red');
+                    else if (id === 'dSuhu' && d.suhu > 95) el.classList.add('highlight-red');
+                    else if (id === 'dSuhu' && d.suhu > 85) el.classList.add('highlight-yellow');
+                    else if (id === 'dGetaran' && d.getaran > 8) el.classList.add('highlight-red');
+                    else if (id === 'dGetaran' && d.getaran > 5) el.classList.add('highlight-yellow');
+                    else if (id === 'dKadarAir' && d.kadar_air > 0.3) el.classList.add('highlight-red');
+                    else if (id === 'dKadarAir' && d.kadar_air > 0.15) el.classList.add('highlight-yellow');
+                    else if (id === 'dLevelOli' && d.level_oli < 30) el.classList.add('highlight-red');
+                    else if (id === 'dLevelOli' && d.level_oli < 50) el.classList.add('highlight-yellow');
+                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.5) el.classList.add('highlight-red');
+                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.0) el.classList.add('highlight-yellow');
+                    else el.classList.add('highlight-green');
+                }
+            });
+
+            let rekomendasi = '✅ Kondisi normal, pantau secara rutin.';
+            if (d.status === 'kritis') {
+                rekomendasi = '🚨 KRITIS! Lakukan shutdown & inspeksi segera!';
+            } else if (d.status === 'peringatan') {
+                if (d.getaran > 5) rekomendasi = '⚠️ Getaran tinggi, periksa bearing & alignment.';
+                else if (d.suhu > 90) rekomendasi = '⚠️ Suhu tinggi, periksa level oli & pendingin.';
+                else if (d.kadar_air > 0.2) rekomendasi = '⚠️ Kadar air tinggi, lakukan purifikasi oli.';
+                else if (d.level_oli < 40) rekomendasi = '⚠️ Level oli rendah, lakukan top-up.';
+                else rekomendasi = '⚠️ Periksa parameter yang menyimpang.';
+            }
+            $('dRekomendasi').textContent = '💡 ' + rekomendasi;
+        }
+
+        // ==========================================
+        //  PROSES DATA DARI MQTT
+        // ==========================================
+        function processData(payload) {
+            try {
+                const data = JSON.parse(payload);
+                const deviceId = data.device_id || 'unknown';
+
+                deviceData[deviceId] = {
+                    device_id: deviceId,
+                    device_name: data.device_name || 'Device-' + deviceId,
+                    status: data.status || 'normal',
+                    viskositas: data.viskositas || 0,
+                    suhu: data.suhu || 0,
+                    getaran: data.getaran || 0,
+                    kadar_air: data.kadar_air || 0,
+                    level_oli: data.level_oli || 0,
+                    tekanan_filter: data.tekanan_filter || 0,
+                    timestamp: data.timestamp || Date.now()
+                };
+
+                const primaryDevice = deviceData[1] || Object.values(deviceData)[0];
+                if (primaryDevice) {
+                    updateChart(primaryDevice.viskositas, primaryDevice.suhu);
+                }
+
+                const d = deviceData[deviceId];
+                const now = new Date();
+                const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
+                    now.getMinutes().toString().padStart(2, '0');
+
+                if (d.status === 'kritis') {
+                    alarmLog.unshift({
+                        time: timeStr,
+                        level: 'critical',
+                        message: `🔴 KRITIS: ${d.device_name} - Getaran ${d.getaran} mm/s, Suhu ${d.suhu}°C`,
+                        device: d.device_name
+                    });
+                } else if (d.status === 'peringatan') {
+                    let msg = `⚠️ Peringatan: ${d.device_name} - `;
+                    if (d.getaran > 5) msg += `Getaran ${d.getaran} mm/s`;
+                    else if (d.suhu > 90) msg += `Suhu ${d.suhu}°C`;
+                    else if (d.kadar_air > 0.2) msg += `Kadar air ${d.kadar_air}%`;
+                    else if (d.level_oli < 40) msg += `Level oli ${d.level_oli}%`;
+                    else msg += `Parameter abnormal`;
+                    alarmLog.unshift({ time: timeStr, level: 'warning-item', message: msg, device: d.device_name });
+                }
+
+                if (alarmLog.length > 50) alarmLog.length = 50;
+
+                renderDevices();
+                renderAlarms();
+                updateKPI();
+
+                const firstDevice = Object.values(deviceData)[0];
+                if (firstDevice && !document.querySelector('.device-item.active')) {
+                    selectDevice(firstDevice.device_id);
+                }
+
+                $('lastUpdate').textContent = 'Terakhir update: ' + now.toLocaleTimeString('id-ID', { hour12: false });
+
+            } catch (e) {
+                console.warn('Gagal parse data:', e);
+            }
+        }
+
+        // ==========================================
+        //  MQTT KONEKSI
+        // ==========================================
+        function connectMQTT() {
+            mqttStatus.textContent = '⏳ Menghubungkan...';
+            mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+
+            const client = mqtt.connect(MQTT_BROKER, {
+                clientId: MQTT_CLIENT_ID,
+                clean: true,
+                reconnectPeriod: 3000
+            });
+
+            client.on('connect', () => {
+                console.log('✅ MQTT Terhubung!');
+                mqttStatus.textContent = '✅ Terhubung';
+                mqttStatus.className = 'mqtt-status text-[11px] px-[14px] py-1 rounded-[30px] border';
+                client.subscribe(MQTT_TOPIC, (err) => {
+                    if (!err) console.log('📡 Subscribe ke:', MQTT_TOPIC);
+                });
+                client.publish('lubrikasi/status', 'Dashboard online');
+            });
+
+            client.on('message', (topic, message) => {
+                if (topic === MQTT_TOPIC) {
+                    processData(message.toString());
+                }
+            });
+
+            client.on('error', (err) => {
+                console.warn('MQTT Error:', err);
+                mqttStatus.textContent = '❌ Error';
+                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+            });
+
+            client.on('close', () => {
+                console.warn('MQTT Terputus');
+                mqttStatus.textContent = '⏳ Terputus...';
+                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+            });
+        }
+
+        // ==========================================
+        //  GENERATE DATA DUMMY
+        // ==========================================
+        function generateDummyData() {
+            const deviceId = Math.floor(Math.random() * 5) + 1;
+            const names = ['GB-01', 'GB-02', 'GB-03', 'GB-04', 'GB-05'];
+
+            const data = {
+                device_id: deviceId,
+                device_name: names[deviceId - 1],
+                timestamp: Date.now(),
+                viskositas: 46 - Math.random() * 5,
+                suhu: 68 + Math.random() * 15,
+                getaran: 2 + Math.random() * 4,
+                kadar_air: 0.02 + Math.random() * 0.2,
+                level_oli: 85 - Math.random() * 20,
+                tekanan_filter: 1.2 + Math.random() * 1.2,
+                status: Math.random() > 0.85 ? 'kritis' : Math.random() > 0.7 ? 'peringatan' : 'normal'
+            };
+
+            processData(JSON.stringify(data));
+        }
+
+        // ==========================================
+        //  INIT
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            connectMQTT();
+
+            setTimeout(() => {
+                if (Object.keys(deviceData).length === 0) {
+                    console.log('⚠️ Tidak ada data dari MQTT, aktifkan dummy generator');
+                    if (!dummyInterval) {
+                        dummyInterval = setInterval(generateDummyData, 1000);
+                    }
+                }
+            }, 10000);
+        });
+    </script>
+
+</body>
+</html>
