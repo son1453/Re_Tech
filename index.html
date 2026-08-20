@@ -14,6 +14,12 @@
 
     <style>
         /* ===== CUSTOM STYLE ===== */
+
+        html, body {
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-color: #0b0e14;
+        }
         @keyframes pulse-dot {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.85); }
@@ -255,12 +261,13 @@
     <!-- ============================================================ -->
     <!-- ===== DASHBOARD ===== -->
     <!-- ============================================================ -->
-    <div id="dashboardScreen" class="hidden bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] h-screen w-screen overflow-hidden flex justify-center items-center p-2">
+    <div id="dashboardScreen" class="hidden bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] lg:h-screen w-screen overflow-hidden flex justify-center items-center p-2">
 
-        <div class="max-w-[1440px] w-full h-full max-h-[98vh] bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-[24px] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col gap-3 overflow-hidden">
+        <div class="max-w-[1440px] w-full h-full lg:max-h-[98vh] bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-[24px] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] flex flex-col gap-3 overflow-hidden">
 
             <!-- ===== HEADER ===== -->
-            <div class="flex justify-between items-center flex-shrink-0 pb-2 border-b border-white/5">
+            <div class="flex justify-between flex-col lg:flex-row items-center flex-shrink-0 pb-2 border-b border-white/5">
+                
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-gradient-to-br from-[#00c8a0] to-[#0088ff] rounded-[10px] flex items-center justify-center font-bold text-base text-white shadow-[0_4px_12px_rgba(0,136,255,0.3)]">
                         ⚙
@@ -271,7 +278,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4 text-[13px] text-[#8da0c0]">
+                <div class="flex flex-wrap justify-center items-center gap-3 text-[13px] text-[#8da0c0] mt-4 lg:mt-0">
                     <span class="flex items-center"><span class="status-dot mr-1.5"></span> Live</span>
                     <span id="mqttStatus" class="mqtt-status disconnected text-[11px] px-3 py-0.5 rounded-[30px] border">⏳ Menghubungkan...</span>
                     <span id="alarmBadge" class="badge-alarm px-3 py-0.5 rounded-[30px] text-xs border">🔔 0 Alarm</span>
@@ -285,31 +292,34 @@
 
             <!-- ===== KPI GRID ===== -->
             <div class="grid grid-cols-5 gap-3 flex-shrink-0">
-                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+
+                <div class="col-span-5 lg:col-span-1 kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
                     <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Total Pelumas Tersimpan</div>
                     <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiStok">-- <span class="text-xs text-[#6b7d9c]">L</span></div>
                     <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiStokSub">⏳ Menunggu data...</div>
                 </div>
 
-                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                <div class="col-span-5 lg:col-span-1 kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
                     <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Kesehatan Rata-rata</div>
                     <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiKesehatan">--<span class="text-sm text-[#6b7d9c]">%</span></div>
                     <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiKesehatanSub">--</div>
                 </div>
 
-                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5" id="kpiAlarmCard">
-                    <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Alarm Aktif</div>
-                    <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiAlarm">0</div>
-                    <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiAlarmSub">● 0 Kritis · ● 0 Peringatan</div>
+                <div class="col-span-5 lg:col-span-1">
+                    <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5" id="kpiAlarmCard">
+                        <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Alarm Aktif</div>
+                        <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiAlarm">0</div>
+                        <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiAlarmSub">● 0 Kritis · ● 0 Peringatan</div>
+                    </div>
                 </div>
 
-                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                <div class="col-span-5 lg:col-span-1 kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
                     <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Penghematan Biaya</div>
                     <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiBiaya">Rp --</div>
                     <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiBiayaSub">--</div>
                 </div>
 
-                <div class="kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
+                <div class="col-span-5 lg:col-span-1 kpi-card bg-white/5 rounded-[12px] p-3 border border-white/5 success">
                     <div class="text-[10px] uppercase tracking-[0.8px] text-[#6b7d9c] font-medium">Rata-rata MTBF</div>
                     <div class="kpi-value text-[24px] font-bold text-[#f0f4ff] leading-tight mt-0.5 transition-all duration-300" id="kpiMtbf">-- <span class="text-xs text-[#6b7d9c]">bln</span></div>
                     <div class="kpi-sub text-[11px] text-[#7e90b0] mt-0.5" id="kpiMtbfSub">--</div>
@@ -317,14 +327,15 @@
             </div>
 
             <!-- ===== BODY GRID ===== -->
-            <div class="grid grid-cols-5 gap-3 flex-1 min-h-0">
+            <!-- <div class="grid grid-cols-5 gap-3 flex-1 min-h-0"> -->
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0">
 
                 <!-- KIRI - Col Span 3 -->
-                <div class="col-span-3 flex flex-col gap-3 min-h-0">
+                <div class="col-span-1 lg:col-span-3 flex flex-col gap-3 min-h-0">
                     
                     <!-- ===== STATUS PERANGKAT - VERTIKAL ===== -->
                     <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
-                        <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                        <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 mb-2 flex-shrink-0">
                             <div class="flex items-center gap-3">
                                 <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">📡 Status Perangkat · Live</span>
                                 <span class="text-[8px] text-[#4a5a7a] bg-white/5 px-2 py-0.5 rounded-full" id="deviceTotal">0 devices</span>
@@ -338,7 +349,7 @@
                         </div>
                         
                         <!-- DEVICE LIST VERTIKAL DENGAN SCROLL -->
-                        <div id="deviceGrid" class="device-list flex-1 overflow-y-auto pr-1 space-y-1.5">
+                        <div id="deviceGrid" class="device-list max-h-[250px] lg:max-h-none lg:flex-1 overflow-y-auto pr-1 space-y-1.5">
                             <!-- Diisi JavaScript -->
                             <div class="text-center text-[#4a5a7a] text-xs py-8">Menunggu data perangkat...</div>
                         </div>
@@ -355,7 +366,7 @@
                 </div>
 
                 <!-- KANAN - Col Span 2 -->
-                <div class="col-span-2 flex flex-col gap-3 min-h-0">
+                <div class="col-span-1 lg:col-span-2 flex flex-col gap-3 min-h-0">
 
                     <!-- ===== ALARM - SCROLL VERTIKAL ===== -->
                     <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
