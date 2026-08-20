@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>LubriCore · Login</title>
+    <title>LubriCore · Realtime</title>
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,6 +34,16 @@
             to { transform: rotate(360deg); }
         }
 
+        @keyframes glow-red {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 80, 80, 0.2); }
+            50% { box-shadow: 0 0 25px rgba(255, 80, 80, 0.5); }
+        }
+
+        @keyframes glow-yellow {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 200, 0, 0.15); }
+            50% { box-shadow: 0 0 20px rgba(255, 200, 0, 0.35); }
+        }
+
         .status-dot {
             display: inline-block;
             width: 10px;
@@ -62,31 +72,77 @@
             animation: spin 0.8s linear infinite;
         }
 
-        .alarm-list::-webkit-scrollbar {
-            width: 3px;
+        /* ===== SCROLLBAR ===== */
+        .alarm-list::-webkit-scrollbar,
+        .device-list::-webkit-scrollbar {
+            width: 4px;
         }
-        .alarm-list::-webkit-scrollbar-track {
-            background: transparent;
+        .alarm-list::-webkit-scrollbar-track,
+        .device-list::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
         }
-        .alarm-list::-webkit-scrollbar-thumb {
+        .alarm-list::-webkit-scrollbar-thumb,
+        .device-list::-webkit-scrollbar-thumb {
             background: #2a3a5a;
             border-radius: 10px;
         }
 
+        /* ===== DEVICE ITEM VERTIKAL ===== */
         .device-item {
-            transition: all 0.3s ease;
+            transition: all 0.25s ease;
             cursor: pointer;
+            position: relative;
         }
 
         .device-item:hover {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.07);
+            transform: translateX(4px);
         }
 
         .device-item.active {
-            background: rgba(255, 255, 255, 0.12);
+            background: rgba(0, 136, 255, 0.10);
             border-left-color: #0088ff !important;
+            box-shadow: inset 0 0 30px rgba(0, 136, 255, 0.05);
         }
 
+        .device-item.active::after {
+            content: '▶';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #0088ff;
+            font-size: 10px;
+        }
+
+        /* Status colors */
+        .device-item.status-green { border-left-color: #00e676; }
+        .device-item.status-yellow { 
+            border-left-color: #ffd54f; 
+            animation: glow-yellow 2s infinite;
+        }
+        .device-item.status-red { 
+            border-left-color: #ff6b6b; 
+            background: rgba(255, 80, 80, 0.06);
+            animation: glow-red 2s infinite;
+        }
+        .device-item.status-gray { border-left-color: #4a5a7a; opacity: 0.5; }
+
+        /* Status dot kecil */
+        .status-dot-sm {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .status-dot-sm.green { background: #00e676; box-shadow: 0 0 8px #00e67666; }
+        .status-dot-sm.yellow { background: #ffd54f; box-shadow: 0 0 8px #ffd54f66; }
+        .status-dot-sm.red { background: #ff6b6b; box-shadow: 0 0 8px #ff6b6b66; animation: pulse-dot 1s infinite; }
+        .status-dot-sm.gray { background: #4a5a7a; }
+
+        /* ===== KPI CARD ===== */
         .kpi-card {
             transition: all 0.2s ease;
         }
@@ -95,11 +151,15 @@
             background: rgba(255, 255, 255, 0.06);
         }
 
-        .status-green { border-left-color: #00e676; }
-        .status-yellow { border-left-color: #ffd54f; }
-        .status-red { border-left-color: #ff6b6b; background: rgba(255, 80, 80, 0.06); }
-        .status-gray { border-left-color: #4a5a7a; opacity: 0.5; }
+        .kpi-card.success .kpi-value { color: #00e676; }
+        .kpi-card.warning .kpi-value { color: #ffd54f; }
+        .kpi-card.danger .kpi-value { color: #ff6b6b; }
 
+        .value.highlight-green { color: #00e676; }
+        .value.highlight-yellow { color: #ffd54f; }
+        .value.highlight-red { color: #ff6b6b; }
+
+        /* ===== MQTT STATUS ===== */
         .mqtt-status {
             background: rgba(0, 230, 118, 0.12);
             color: #00e676;
@@ -118,13 +178,35 @@
             border: 1px solid rgba(255, 200, 0, 0.15);
         }
 
-        .kpi-card.success .kpi-value { color: #00e676; }
-        .kpi-card.warning .kpi-value { color: #ffd54f; }
-        .kpi-card.danger .kpi-value { color: #ff6b6b; }
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .device-item .dev-temp {
+                font-size: 11px !important;
+            }
+            .device-item .dev-name {
+                font-size: 10px !important;
+            }
+            .device-item .dev-visco {
+                font-size: 11px !important;
+            }
+        }
 
-        .value.highlight-green { color: #00e676; }
-        .value.highlight-yellow { color: #ffd54f; }
-        .value.highlight-red { color: #ff6b6b; }
+        @media (max-width: 480px) {
+            .device-item {
+                padding: 6px 10px !important;
+                font-size: 10px !important;
+            }
+            .device-item .status-badge {
+                font-size: 7px !important;
+                padding: 1px 6px !important;
+            }
+            .device-item .dev-temp {
+                font-size: 10px !important;
+            }
+            .device-item .dev-visco {
+                font-size: 10px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -135,7 +217,6 @@
     <div id="loginScreen" class="bg-[#0b0e14] h-screen w-screen overflow-hidden flex justify-center items-center">
         <div class="login-container max-w-md w-full mx-4 p-8 bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,255,255,0.04)] border border-white/5">
 
-            <!-- Logo -->
             <div class="flex flex-col items-center mb-8">
                 <div class="w-16 h-16 bg-gradient-to-br from-[#00c8a0] to-[#0088ff] rounded-2xl flex items-center justify-center text-3xl text-white shadow-[0_4px_20px_rgba(0,136,255,0.3)] mb-4">
                     ⚙
@@ -144,7 +225,6 @@
                 <p class="text-[#6b7d9c] text-sm mt-1">Sistem Monitoring Pelumas · IIoT</p>
             </div>
 
-            <!-- Form Login -->
             <form id="loginForm" class="space-y-4" onsubmit="handleLogin(event)">
                 <div>
                     <label class="block text-[#8da0c0] text-sm font-medium mb-1.5">Username</label>
@@ -173,7 +253,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- ===== DASHBOARD (disembunyikan awalnya) ===== -->
+    <!-- ===== DASHBOARD ===== -->
     <!-- ============================================================ -->
     <div id="dashboardScreen" class="hidden bg-[#0b0e14] font-['Segoe_UI',system-ui,sans-serif] text-[#e8edf5] h-screen w-screen overflow-hidden flex justify-center items-center p-2">
 
@@ -239,43 +319,57 @@
             <!-- ===== BODY GRID ===== -->
             <div class="grid grid-cols-5 gap-3 flex-1 min-h-0">
 
-                <!-- KIRI (Col Span 2) -->
+                <!-- KIRI - Col Span 3 -->
                 <div class="col-span-3 flex flex-col gap-3 min-h-0">
+                    
+                    <!-- ===== STATUS PERANGKAT - VERTIKAL ===== -->
                     <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
-                        <div class="flex justify-between items-center mb-1.5 flex-shrink-0">
-                            <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">📡 Status Perangkat · Live</span>
+                        <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                            <div class="flex items-center gap-3">
+                                <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">📡 Status Perangkat · Live</span>
+                                <span class="text-[8px] text-[#4a5a7a] bg-white/5 px-2 py-0.5 rounded-full" id="deviceTotal">0 devices</span>
+                            </div>
                             <div class="flex gap-3 text-[9px]">
-                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#00e676]">Normal</span>
-                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#ffd54f]">Peringatan</span>
-                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#ff6b6b]">Kritis</span>
-                                <span class="before:content-['●'] before:mr-1 before:text-[11px] before:text-[#4a5a7a]">Offline</span>
+                                <span class="flex items-center gap-1"><span class="status-dot-sm green"></span>Normal</span>
+                                <span class="flex items-center gap-1"><span class="status-dot-sm yellow"></span>Peringatan</span>
+                                <span class="flex items-center gap-1"><span class="status-dot-sm red"></span>Kritis</span>
+                                <span class="flex items-center gap-1"><span class="status-dot-sm gray"></span>Offline</span>
                             </div>
                         </div>
-                        <div id="deviceGrid" class="grid grid-cols-5 gap-2 flex-1 min-h-0">
+                        
+                        <!-- DEVICE LIST VERTIKAL DENGAN SCROLL -->
+                        <div id="deviceGrid" class="device-list flex-1 overflow-y-auto pr-1 space-y-1.5">
                             <!-- Diisi JavaScript -->
+                            <div class="text-center text-[#4a5a7a] text-xs py-8">Menunggu data perangkat...</div>
                         </div>
                     </div>
 
+                    <!-- ===== CHART ===== -->
                     <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
                         <div class="text-[10px] text-[#6b7d9c] tracking-[0.5px] font-medium mb-1 flex-shrink-0">📈 Tren Viskositas & Suhu · 60 Detik Terakhir</div>
                         <div class="flex-1 w-full relative min-h-0">
                             <canvas id="trendChart"></canvas>
                         </div>
                     </div>
+
                 </div>
 
-                <!-- KANAN (Col Span 3) -->
+                <!-- KANAN - Col Span 2 -->
                 <div class="col-span-2 flex flex-col gap-3 min-h-0">
-                    <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col overflow-hidden">
+
+                    <!-- ===== ALARM - SCROLL VERTIKAL ===== -->
+                    <div class="flex-[1.2] bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
                         <div class="flex justify-between items-center mb-1.5 flex-shrink-0">
                             <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">🚨 Log Alarm · Terbaru</span>
                             <span id="alarmCount" class="text-[9px] text-[#4a5a7a]">0 alarm</span>
                         </div>
-                        <div id="alarmList" class="flex flex-col gap-1 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [scrollbar-color:#2a364f_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                        <!-- ALARM LIST DENGAN SCROLL -->
+                        <div id="alarmList" class="alarm-list flex flex-col gap-1 flex-1 overflow-y-auto pr-1">
                             <div class="text-center text-[#4a5a7a] text-xs py-5">Menunggu data dari sensor...</div>
                         </div>
                     </div>
 
+                    <!-- ===== DETAIL ===== -->
                     <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col justify-between">
                         <div class="flex items-center justify-between mb-1 flex-shrink-0">
                             <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">🔧 Detail · <span id="detailDeviceName">--</span></span>
@@ -293,6 +387,7 @@
                             <span id="dRekomendasi" class="text-[#ffd54f] text-[10px]">💡 Menunggu data...</span>
                         </div>
                     </div>
+
                 </div>
 
             </div>
@@ -310,21 +405,9 @@
         //  SISTEM LOGIN
         // ==========================================
 
-        // Kredensial default (bisa diganti)
         const VALID_USERNAME = 'admin';
         const VALID_PASSWORD = 'admin123';
 
-        // Cek apakah sudah login sebelumnya (session via localStorage)
-        function checkSession() {
-            const isLoggedIn = localStorage.getItem('lubricore_logged_in');
-            if (isLoggedIn === 'true') {
-                showDashboard();
-                return true;
-            }
-            return false;
-        }
-
-        // Handle login form submit
         function handleLogin(event) {
             event.preventDefault();
 
@@ -334,12 +417,9 @@
             const btnText = document.getElementById('loginBtnText');
             const btnLoading = document.getElementById('loginBtnLoading');
 
-            // Validasi sederhana
             if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-                // Simpan session
                 localStorage.setItem('lubricore_logged_in', 'true');
 
-                // Tampilkan loading
                 btnText.classList.add('hidden');
                 btnLoading.classList.remove('hidden');
                 errorEl.classList.add('hidden');
@@ -350,41 +430,32 @@
                 }, 500);
 
             } else {
-                // Tampilkan error
                 errorEl.classList.remove('hidden');
                 btnText.classList.remove('hidden');
                 btnLoading.classList.add('hidden');
-
-                // Animasi shake (opsional)
-                errorEl.style.animation = 'none';
                 setTimeout(() => {
                     errorEl.style.animation = 'slideIn 0.3s ease';
                 }, 10);
             }
         }
 
-        // Show dashboard, hide login
         function showDashboard() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('dashboardScreen').classList.remove('hidden');
         }
 
-        // Show login, hide dashboard
         function showLogin() {
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
         }
 
-        // Handle logout
         function handleLogout() {
             localStorage.removeItem('lubricore_logged_in');
-            // Hentikan semua interval
             if (dummyInterval) {
                 clearInterval(dummyInterval);
                 dummyInterval = null;
             }
             showLogin();
-            // Reset state
             deviceData = {};
             alarmLog = [];
             selectedDeviceId = null;
@@ -397,7 +468,6 @@
                 chartInstance.destroy();
                 chartInstance = null;
             }
-            // Reload page agar clean
             location.reload();
         }
 
@@ -431,7 +501,7 @@
         const mqttStatus = $('mqttStatus');
 
         // ==========================================
-        //  INISIALISASI DASHBOARD (dipanggil setelah login)
+        //  INIT DASHBOARD
         // ==========================================
         function initDashboard() {
             initChart();
@@ -446,7 +516,6 @@
                 }
             }, 10000);
 
-            // Jalankan clock
             updateClock();
             setInterval(updateClock, 1000);
         }
@@ -460,7 +529,7 @@
         }
 
         // ==========================================
-        //  INISIALISASI CHART
+        //  CHART
         // ==========================================
         function initChart() {
             const ctx = document.getElementById('trendChart').getContext('2d');
@@ -529,9 +598,6 @@
             });
         }
 
-        // ==========================================
-        //  UPDATE CHART
-        // ==========================================
         function updateChart(viskositas, suhu) {
             const now = new Date();
             const label = now.getHours().toString().padStart(2, '0') + ':' +
@@ -554,32 +620,68 @@
         }
 
         // ==========================================
-        //  RENDER DEVICE GRID
+        //  RENDER DEVICE - VERTIKAL DENGAN SCROLL
         // ==========================================
         function renderDevices() {
             const devices = Object.values(deviceData);
             if (devices.length === 0) {
                 deviceGrid.innerHTML =
-                    `<div style="grid-column:1/-1;text-align:center;color:#4a5a7a;font-size:12px;">Menunggu data perangkat...</div>`;
+                    `<div class="text-center text-[#4a5a7a] text-xs py-8">Menunggu data perangkat...</div>`;
+                $('deviceTotal').textContent = '0 devices';
                 return;
             }
 
+            // Hitung statistik
+            let totalNormal = 0, totalWarning = 0, totalCritical = 0, totalOffline = 0;
+            devices.forEach(d => {
+                if (d.status === 'normal') totalNormal++;
+                else if (d.status === 'peringatan') totalWarning++;
+                else if (d.status === 'kritis') totalCritical++;
+                else totalOffline++;
+            });
+
+            $('deviceTotal').textContent = `${devices.length} devices · ${totalCritical}⚠️`;
+
+            // Render vertical list
             deviceGrid.innerHTML = devices.map(d => {
                 const statusClass = d.status || 'gray';
-                const tempDisplay = d.suhu ? d.suhu.toFixed(2) + '°C' : '--';
-                const statusText = {
-                    'normal': '✅ Normal',
-                    'peringatan': '⚠️ Peringatan',
-                    'kritis': '🔴 Kritis',
-                    'gray': '⏳ Offline'
-                } [statusClass] || '--';
+                const statusDotClass = {
+                    'normal': 'green',
+                    'peringatan': 'yellow',
+                    'kritis': 'red',
+                    'gray': 'gray'
+                } [statusClass] || 'gray';
+
+                const tempDisplay = d.suhu ? d.suhu.toFixed(1) + '°C' : '--';
+                const viscoDisplay = d.viskositas ? d.viskositas.toFixed(1) + ' cSt' : '--';
                 const isActive = selectedDeviceId === d.device_id ? 'active' : '';
 
+                const statusLabel = {
+                    'normal': 'Normal',
+                    'peringatan': 'Peringatan',
+                    'kritis': 'KRITIS!',
+                    'gray': 'Offline'
+                } [statusClass] || '--';
+
+                const statusBadgeColor = {
+                    'normal': 'bg-green-500/20 text-green-400',
+                    'peringatan': 'bg-yellow-500/20 text-yellow-400',
+                    'kritis': 'bg-red-500/20 text-red-400 animate-pulse',
+                    'gray': 'bg-white/5 text-[#4a5a7a]'
+                } [statusClass] || 'bg-white/5 text-[#4a5a7a]';
+
                 return `
-                    <div class="device-item bg-white/5 rounded-[10px] px-[6px] py-2 text-center border-l-4 border-[#4a5a7a] flex flex-col justify-center status-${statusClass} ${isActive}" onclick="selectDevice('${d.device_id}')">
-                        <div class="dev-name text-[10px] font-medium text-[#b0c4e0]">${d.device_name || 'Device'}</div>
-                        <div class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</div>
-                        <div class="dev-status text-[8px] text-[#6b7d9c] mt-0.5">${statusText}</div>
+                    <div class="device-item status-${statusClass} ${isActive} bg-white/5 rounded-[10px] px-4 py-2.5 border-l-4 border-[#4a5a7a] flex items-center justify-between" onclick="selectDevice('${d.device_id}')">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <span class="status-dot-sm ${statusDotClass} flex-shrink-0"></span>
+                            <span class="dev-name text-[11px] font-medium text-[#b0c4e0] truncate">${d.device_name || 'Device'}</span>
+                        </div>
+                        <div class="flex items-center gap-4 flex-shrink-0">
+                            <span class="dev-visco text-[13px] font-semibold text-[#e8edf5]">${viscoDisplay}</span>
+                            <span class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</span>
+                            <span class="status-badge text-[8px] px-2 py-0.5 rounded-full ${statusBadgeColor} hidden md:inline">${statusLabel}</span>
+                            <span class="text-[10px]">${statusClass === 'kritis' ? '🔴' : statusClass === 'peringatan' ? '⚠️' : '✅'}</span>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -588,22 +690,22 @@
         }
 
         // ==========================================
-        //  RENDER ALARM
+        //  RENDER ALARM - SCROLL VERTIKAL, UPDATE TERBARU
         // ==========================================
         function renderAlarms() {
             if (alarmLog.length === 0) {
                 alarmList.innerHTML =
-                    `<div style="text-align:center;color:#4a5a7a;font-size:12px;padding:20px 0;">✅ Semua sistem normal</div>`;
+                    `<div class="text-center text-[#4a5a7a] text-xs py-5">✅ Semua sistem normal</div>`;
                 $('alarmCount').textContent = '0 alarm';
                 return;
             }
 
-            const latest = alarmLog.slice(0, 5);
-            alarmList.innerHTML = latest.map(a => `
-                <div class="alarm-item flex items-center gap-2 px-[10px] py-2 bg-white/5 rounded-lg border-l-[3px] border-[#4a5a7a] text-[11px] flex-shrink-0 ${a.level}">
-                    <span class="alarm-time text-[#6b7d9c] text-[9px] min-w-[42px]">${a.time}</span>
-                    <span class="alarm-msg flex-1 text-[#c8d6e8] text-[10px]">${a.message}</span>
-                    <span class="alarm-device font-medium text-[#8da0c0] text-[9px] bg-white/5 px-2 py-0.5 rounded-full">${a.device}</span>
+            // Tampilkan SEMUA alarm (diurutkan dari yang terbaru)
+            alarmList.innerHTML = alarmLog.map(a => `
+                <div class="alarm-item flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border-l-[3px] border-[#4a5a7a] text-[11px] flex-shrink-0 ${a.level}">
+                    <span class="alarm-time text-[#6b7d9c] text-[9px] min-w-[36px]">${a.time}</span>
+                    <span class="alarm-msg flex-1 text-[#c8d6e8] text-[10px] truncate">${a.message}</span>
+                    <span class="alarm-device font-medium text-[#8da0c0] text-[9px] bg-white/5 px-2 py-0.5 rounded-full whitespace-nowrap">${a.device}</span>
                 </div>
             `).join('');
 
@@ -619,14 +721,12 @@
 
             let totalHealth = 0;
             let totalLevel = 0;
-            let kritis = 0,
-                peringatan = 0;
+            let kritis = 0, peringatan = 0;
 
             devices.forEach(d => {
                 if (d.status === 'normal') totalHealth += 100;
-                else if (d.status === 'peringatan') { totalHealth += 60;
-                    peringatan++; } else if (d.status === 'kritis') { totalHealth += 20;
-                    kritis++; }
+                else if (d.status === 'peringatan') { totalHealth += 60; peringatan++; }
+                else if (d.status === 'kritis') { totalHealth += 20; kritis++; }
                 if (d.level_oli) totalLevel += d.level_oli;
             });
 
@@ -668,13 +768,8 @@
 
             selectedDeviceId = deviceId;
 
-            document.querySelectorAll('.device-item').forEach(el => {
-                el.classList.remove('active');
-            });
-            const activeItem = document.querySelector(`.device-item[onclick="selectDevice('${deviceId}')"]`);
-            if (activeItem) {
-                activeItem.classList.add('active');
-            }
+            // Re-render devices untuk update active state
+            renderDevices();
 
             $('detailDeviceName').textContent = d.device_name || 'Device ' + deviceId;
 
@@ -741,12 +836,10 @@
                 else rekomendasi = '⚠️ Periksa parameter yang menyimpang.';
             }
             $('dRekomendasi').textContent = '💡 ' + rekomendasi;
-
-            renderDevices();
         }
 
         // ==========================================
-        //  PROSES DATA DARI MQTT
+        //  PROSES DATA
         // ==========================================
         function processData(payload) {
             try {
@@ -793,7 +886,8 @@
                     alarmLog.unshift({ time: timeStr, level: 'warning-item', message: msg, device: d.device_name });
                 }
 
-                if (alarmLog.length > 50) alarmLog.length = 50;
+                // Batasi alarm log (misal max 100)
+                if (alarmLog.length > 100) alarmLog.length = 100;
 
                 renderDevices();
                 renderAlarms();
@@ -861,19 +955,19 @@
         //  GENERATE DATA DUMMY
         // ==========================================
         function generateDummyData() {
-            const deviceId = Math.floor(Math.random() * 5) + 1;
-            const names = ['GB-01', 'GB-02', 'GB-03', 'GB-04', 'GB-05'];
+            const deviceId = Math.floor(Math.random() * 10) + 1;
+            const names = ['GB-01', 'GB-02', 'GB-03', 'GB-04', 'GB-05', 'GB-06', 'GB-07', 'GB-08', 'GB-09', 'GB-10'];
 
             const data = {
                 device_id: deviceId,
                 device_name: names[deviceId - 1],
                 timestamp: Date.now(),
-                viskositas: 46 - Math.random() * 5,
-                suhu: 68 + Math.random() * 15,
-                getaran: 2 + Math.random() * 4,
-                kadar_air: 0.02 + Math.random() * 0.2,
-                level_oli: 85 - Math.random() * 20,
-                tekanan_filter: 1.2 + Math.random() * 1.2,
+                viskositas: 46 - Math.random() * 8,
+                suhu: 68 + Math.random() * 20,
+                getaran: 2 + Math.random() * 5,
+                kadar_air: 0.02 + Math.random() * 0.25,
+                level_oli: 85 - Math.random() * 25,
+                tekanan_filter: 1.2 + Math.random() * 1.5,
                 status: Math.random() > 0.85 ? 'kritis' : Math.random() > 0.7 ? 'peringatan' : 'normal'
             };
 
@@ -881,10 +975,9 @@
         }
 
         // ==========================================
-        //  INIT - Cek Session saat load
+        //  INIT
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            // Cek apakah sudah login
             const isLoggedIn = localStorage.getItem('lubricore_logged_in');
             if (isLoggedIn === 'true') {
                 showDashboard();
