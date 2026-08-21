@@ -50,7 +50,30 @@
             50% { box-shadow: 0 0 20px rgba(255, 200, 0, 0.35); }
         }
 
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
         .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #00e676;
+            border-radius: 50%;
+            box-shadow: 0 0 12px #00e67666;
+            animation: pulse-dot 2s infinite;
+        }
+
+        .status-dot-offline {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #4a5a7a;
+            border-radius: 50%;
+        }
+
+        .status-dot-online {
             display: inline-block;
             width: 10px;
             height: 10px;
@@ -76,6 +99,10 @@
             border-top: 2px solid #00c8a0;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
+        }
+
+        .offline-badge {
+            animation: blink 1.5s infinite;
         }
 
         /* ===== SCROLLBAR ===== */
@@ -182,6 +209,29 @@
             background: rgba(255, 200, 0, 0.15);
             color: #ffd54f;
             border: 1px solid rgba(255, 200, 0, 0.15);
+        }
+
+        /* ===== SETTING MODAL ===== */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+        }
+        .modal-content {
+            animation: fadeIn 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .modal-content::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+        }
+        .modal-content::-webkit-scrollbar-thumb {
+            background: #2a3a5a;
+            border-radius: 10px;
         }
 
         /* ===== RESPONSIVE ===== */
@@ -327,7 +377,6 @@
             </div>
 
             <!-- ===== BODY GRID ===== -->
-            <!-- <div class="grid grid-cols-5 gap-3 flex-1 min-h-0"> -->
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 flex-1 min-h-0">
 
                 <!-- KIRI - Col Span 3 -->
@@ -357,7 +406,7 @@
 
                     <!-- ===== CHART ===== -->
                     <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
-                        <div class="text-[10px] text-[#6b7d9c] tracking-[0.5px] font-medium mb-1 flex-shrink-0">📈 Tren Viskositas & Suhu · 60 Detik Terakhir</div>
+                        <div class="text-[10px] text-[#6b7d9c] tracking-[0.5px] font-medium mb-1 flex-shrink-0">📈 Tren Viskositas & Suhu · <span id="chartDeviceLabel">Global</span></div>
                         <div class="flex-1 w-full relative min-h-0">
                             <canvas id="trendChart"></canvas>
                         </div>
@@ -380,11 +429,17 @@
                         </div>
                     </div>
 
-                    <!-- ===== DETAIL ===== -->
-                    <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col justify-between">
+                    <!-- ===== DETAIL + SETTING LENGKAP ===== -->
+                    <div class="flex-1 bg-white/5 rounded-[14px] border border-white/5 p-3 min-h-0 flex flex-col">
                         <div class="flex items-center justify-between mb-1 flex-shrink-0">
                             <span class="text-[11px] font-medium text-[#6b7d9c] tracking-[0.5px]">🔧 Detail · <span id="detailDeviceName">--</span></span>
-                            <span id="detailStatus" class="text-[10px] font-normal"></span>
+                            <div class="flex items-center gap-2">
+                                <span id="detailStatus" class="text-[10px] font-normal"></span>
+                                <button onclick="openSettingModal()" 
+                                        class="text-[9px] px-2 py-0.5 rounded-lg border border-white/10 text-[#6b7d9c] hover:text-[#00c8a0] hover:border-[#00c8a0]/30 transition-all flex items-center gap-1">
+                                    ⚙️ <span class="hidden sm:inline">Setting</span>
+                                </button>
+                            </div>
                         </div>
                         <div id="detailGrid" class="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 content-center">
                             <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Viskositas</span><span class="value font-medium text-[#e8edf5]" id="dViskositas">--</span></div>
@@ -393,7 +448,35 @@
                             <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Kadar Air</span><span class="value font-medium text-[#e8edf5]" id="dKadarAir">--</span></div>
                             <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Level Oli</span><span class="value font-medium text-[#e8edf5]" id="dLevelOli">--</span></div>
                             <div class="flex justify-between py-0.5 border-b border-white/5 text-[11px]"><span class="text-[#6b7d9c]">Tekanan Filter</span><span class="value font-medium text-[#e8edf5]" id="dTekananFilter">--</span></div>
-                        </div>
+                            
+                            <!-- ===== DATA IDEAL (dari setting) + RUNNING HOURS OTOMATIS ===== -->
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[11px] col-span-2 mt-0.5 pt-0.5 border-t border-white/10">
+    <span class="text-[#4a5a7a] text-[9px]">📋 Data Equipment</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px] col-span-2">
+    <span class="text-[#4a5a7a]">MAC Address</span>
+    <span class="font-medium text-[#00c8a0] font-mono text-[10px]" id="dMacAddress">--</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px] col-span-2">
+    <span class="text-[#4a5a7a]">IP Address</span>
+    <span class="font-medium text-[#00c8a0] font-mono text-[10px]" id="dIpAddress">--</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px]">
+    <span class="text-[#4a5a7a]">Kapasitas Tanki</span>
+    <span class="font-medium text-[#e8edf5]" id="dKapasitas">--</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px]">
+    <span class="text-[#4a5a7a]">Running Hours</span>
+    <span class="font-medium text-[#00c8a0]" id="dRunningHours">--</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px]">
+    <span class="text-[#4a5a7a]">Viskositas Ideal</span>
+    <span class="font-medium text-[#e8edf5]" id="dViskositasIdeal">--</span>
+</div>
+<div class="flex justify-between py-0.5 border-b border-white/5 text-[10px]">
+    <span class="text-[#4a5a7a]">Jenis Oli</span>
+    <span class="font-medium text-[#e8edf5]" id="dJenisOli">--</span>
+</div>
                         <div class="pt-1 flex-shrink-0">
                             <span id="dRekomendasi" class="text-[#ffd54f] text-[10px]">💡 Menunggu data...</span>
                         </div>
@@ -409,6 +492,154 @@
     </div>
 
     <!-- ============================================================ -->
+    <!-- ===== MODAL SETTING EQUIPMENT - LENGKAP ===== -->
+    <!-- ============================================================ -->
+    <div id="settingModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-4">
+        <div class="modal-content bg-gradient-to-br from-[#11161f] to-[#0d1119] rounded-2xl border border-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] max-w-xl w-full p-6">
+
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-[16px] font-semibold text-[#e8edf5]">⚙️ Setting Equipment</h2>
+                <button onclick="closeSettingModal()" class="text-[#6b7d9c] hover:text-[#ff6b6b] text-xl">&times;</button>
+            </div>
+
+            <div class="text-[11px] text-[#6b7d9c] mb-3">
+                Atur parameter untuk equipment <span id="modalDeviceName" class="text-[#e8edf5] font-medium">--</span>
+            </div>
+
+            <div id="settingMessage" class="hidden mb-3 p-2 rounded-lg text-[11px] text-center"></div>
+
+            <form id="settingForm" class="space-y-3">
+
+                <!-- ===== PARAMETER SENSOR ===== -->
+                <div class="border-b border-white/5 pb-3">
+                    <div class="text-[12px] font-semibold text-[#8da0c0] mb-2">📊 Parameter Sensor</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Viskositas Min (cSt)</label>
+                            <input type="number" step="0.1" id="setVisMin" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="38.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Viskositas Max (cSt)</label>
+                            <input type="number" step="0.1" id="setVisMax" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="50.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Suhu Max (°C)</label>
+                            <input type="number" step="0.1" id="setSuhuMax" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="95.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Getaran Max (mm/s)</label>
+                            <input type="number" step="0.1" id="setGetaranMax" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="8.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Kadar Air Max (%)</label>
+                            <input type="number" step="0.01" id="setKadarAirMax" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="0.3" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Level Oli Min (%)</label>
+                            <input type="number" step="0.1" id="setLevelOliMin" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="30.0" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== DATA EQUIPMENT ===== -->
+                <div class="border-b border-white/5 pb-3">
+                    <div class="text-[12px] font-semibold text-[#8da0c0] mb-2">📋 Data Equipment</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Kapasitas Tanki (L)</label>
+                            <input type="number" step="0.1" id="setKapasitas" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="50.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Jenis Oli</label>
+                            <input type="text" id="setJenisOli" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="ISO VG 46" />
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Viskositas Ideal (cSt)</label>
+                            <input type="number" step="0.1" id="setViskositasIdeal" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="46.0" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== KALIBRASI OFFSET ===== -->
+                <div class="border-b border-white/5 pb-3">
+                    <div class="text-[12px] font-semibold text-[#8da0c0] mb-2">🎯 Kalibrasi Offset</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Offset Viskositas</label>
+                            <input type="number" step="0.1" id="setOffVis" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="0.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Offset Suhu</label>
+                            <input type="number" step="0.1" id="setOffSuhu" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="0.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Offset Getaran</label>
+                            <input type="number" step="0.1" id="setOffGetaran" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="0.0" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-[#6b7d9c] mb-0.5">Offset Kadar Air</label>
+                            <input type="number" step="0.01" id="setOffKadar" 
+                                   class="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[#e8edf5] text-sm focus:outline-none focus:border-[#00c8a0]" 
+                                   placeholder="0.0" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== RESET RUNNING HOURS ===== -->
+                <div>
+                    <div class="text-[12px] font-semibold text-[#8da0c0] mb-2">⏱️ Maintenance</div>
+                    <button type="button" onclick="resetRunningHours()" 
+                            class="w-full px-3 py-2 bg-red-500/20 border border-red-500/20 rounded-lg text-red-400 text-sm hover:bg-red-500/30 transition-colors">
+                        🔄 Reset Running Hours (setelah maintenance)
+                    </button>
+                    <p class="text-[8px] text-[#4a5a7a] mt-1">Gunakan setelah melakukan perbaikan / penggantian oli</p>
+                </div>
+
+                <!-- ===== BUTTON ===== -->
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="saveFullSetting()" 
+                            class="flex-1 py-2 bg-gradient-to-r from-[#00c8a0] to-[#0088ff] rounded-lg text-white font-semibold text-sm hover:opacity-90 transition-opacity shadow-[0_4px_16px_rgba(0,136,255,0.3)]">
+                        💾 Simpan Semua
+                    </button>
+                    <button type="button" onclick="loadFullSetting()" 
+                            class="py-2 px-4 bg-white/10 border border-white/10 rounded-lg text-[#8da0c0] text-sm hover:text-[#e8edf5] transition-colors">
+                        🔄 Load
+                    </button>
+                    <button type="button" onclick="resetFullSetting()" 
+                            class="py-2 px-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm hover:bg-red-500/20 transition-colors">
+                        🗑️ Reset
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- ===== SCRIPT ===== -->
     <!-- ============================================================ -->
     <script>
@@ -419,6 +650,1067 @@
         const VALID_USERNAME = 'admin';
         const VALID_PASSWORD = 'admin123';
 
+        // ==========================================
+        //  DATA SETTING LENGKAP (Parameter + Kalibrasi + Equipment)
+        // ==========================================
+        function getFullSetting(deviceId) {
+            const settings = getEquipmentSettings();
+            if (settings[deviceId]) {
+                return settings[deviceId];
+            }
+            return {
+                // Parameter Sensor
+                viskositas_min: 38.0,
+                viskositas_max: 50.0,
+                suhu_max: 95.0,
+                getaran_max: 8.0,
+                kadar_air_max: 0.3,
+                level_oli_min: 30.0,
+                // Data Equipment
+                kapasitas: 50.0,
+                jenis_oli: "ISO VG 46",
+                viskositas_ideal: 46.0,
+                // Kalibrasi Offset
+                offset_viskositas: 0.0,
+                offset_suhu: 0.0,
+                offset_getaran: 0.0,
+                offset_kadar_air: 0.0
+            };
+        }
+
+        function getEquipmentSettings() {
+            const data = localStorage.getItem('lubricore_equipment_settings');
+            return data ? JSON.parse(data) : {};
+        }
+
+        function saveEquipmentSettings(settings) {
+            localStorage.setItem('lubricore_equipment_settings', JSON.stringify(settings));
+        }
+
+        function getSetting(deviceId, key, defaultValue) {
+            const settings = getEquipmentSettings();
+            if (settings[deviceId] && settings[deviceId][key] !== undefined) {
+                return settings[deviceId][key];
+            }
+            return defaultValue;
+        }
+
+        function setSetting(deviceId, key, value) {
+            const settings = getEquipmentSettings();
+            if (!settings[deviceId]) settings[deviceId] = {};
+            settings[deviceId][key] = value;
+            saveEquipmentSettings(settings);
+        }
+
+        // ==========================================
+        //  DATA RUNNING HOURS OTOMATIS
+        // ==========================================
+        function getRunningHoursData() {
+            const data = localStorage.getItem('lubricore_running_hours');
+            return data ? JSON.parse(data) : {};
+        }
+
+        function saveRunningHoursData(data) {
+            localStorage.setItem('lubricore_running_hours', JSON.stringify(data));
+        }
+
+        function getRunningHours(deviceId) {
+            const data = getRunningHoursData();
+            if (data[deviceId]) {
+                return data[deviceId];
+            }
+            return null;
+        }
+
+        function resetRunningHours() {
+            const d = deviceData[selectedDeviceId];
+            if (!d) {
+                showToast('Pilih perangkat terlebih dahulu!', 'warning');
+                return;
+            }
+
+            const deviceId = String(selectedDeviceId);
+            const data = getRunningHoursData();
+            
+            data[deviceId] = {
+                last_reset: Date.now(),
+                total_seconds: 0,
+                last_known: 0
+            };
+            saveRunningHoursData(data);
+            
+            showToast('✅ Running hours direset!', 'success');
+            if (selectedDeviceId) {
+                selectDevice(selectedDeviceId);
+            }
+        }
+
+        function updateRunningHours() {
+            const now = Date.now();
+            const data = getRunningHoursData();
+            let updated = false;
+
+            Object.keys(data).forEach(deviceId => {
+                const entry = data[deviceId];
+                if (entry.last_reset) {
+                    const diff = (now - entry.last_reset) / 1000;
+                    entry.total_seconds = diff;
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                saveRunningHoursData(data);
+                if (selectedDeviceId && deviceData[selectedDeviceId]) {
+                    selectDevice(selectedDeviceId);
+                }
+            }
+        }
+
+        setInterval(updateRunningHours, 10000);
+
+        function formatRunningHours(seconds) {
+            if (!seconds || seconds < 0) return '0 jam';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (hours === 0) return minutes + ' menit';
+            return hours + ' jam ' + (minutes > 0 ? minutes + ' menit' : '');
+        }
+
+        // ==========================================
+        //  DATA DEVICE PERSISTENT
+        // ==========================================
+        function getPersistentDevices() {
+            const data = localStorage.getItem('lubricore_devices');
+            return data ? JSON.parse(data) : {};
+        }
+
+        function savePersistentDevices(devices) {
+            localStorage.setItem('lubricore_devices', JSON.stringify(devices));
+        }
+
+        // ==========================================
+        //  DATA HISTORIS UNTUK CHART
+        // ==========================================
+        function getHistoricalData(deviceId) {
+            const data = localStorage.getItem('lubricore_historical_' + deviceId);
+            return data ? JSON.parse(data) : { labels: [], viskositas: [], suhu: [] };
+        }
+
+        function saveHistoricalData(deviceId, data) {
+            localStorage.setItem('lubricore_historical_' + deviceId, JSON.stringify(data));
+        }
+
+        function addHistoricalData(deviceId, viskositas, suhu) {
+            const data = getHistoricalData(deviceId);
+            const now = new Date();
+            const label = now.getHours().toString().padStart(2, '0') + ':' +
+                now.getMinutes().toString().padStart(2, '0') + ':' +
+                now.getSeconds().toString().padStart(2, '0');
+            
+            data.labels.push(label);
+            data.viskositas.push(viskositas);
+            data.suhu.push(suhu);
+
+            if (data.labels.length > 60) {
+                data.labels.shift();
+                data.viskositas.shift();
+                data.suhu.shift();
+            }
+
+            saveHistoricalData(deviceId, data);
+            return data;
+        }
+
+        // ==========================================
+        //  MODAL SETTING LENGKAP
+        // ==========================================
+        let settingDeviceId = null;
+
+        function openSettingModal() {
+            const d = deviceData[selectedDeviceId];
+            if (!d) {
+                showToast('Pilih perangkat terlebih dahulu!', 'warning');
+                return;
+            }
+
+            settingDeviceId = selectedDeviceId;
+            document.getElementById('modalDeviceName').textContent = d.device_name || 'Device ' + selectedDeviceId;
+
+            loadFullSetting();
+
+            document.getElementById('settingMessage').classList.add('hidden');
+            document.getElementById('settingModal').classList.remove('hidden');
+        }
+
+        function closeSettingModal() {
+            document.getElementById('settingModal').classList.add('hidden');
+        }
+
+        function loadFullSetting() {
+            const deviceId = settingDeviceId;
+            if (!deviceId) return;
+
+            const settings = getFullSetting(deviceId);
+            
+            document.getElementById('setVisMin').value = settings.viskositas_min || 38;
+            document.getElementById('setVisMax').value = settings.viskositas_max || 50;
+            document.getElementById('setSuhuMax').value = settings.suhu_max || 95;
+            document.getElementById('setGetaranMax').value = settings.getaran_max || 8;
+            document.getElementById('setKadarAirMax').value = settings.kadar_air_max || 0.3;
+            document.getElementById('setLevelOliMin').value = settings.level_oli_min || 30;
+            
+            document.getElementById('setKapasitas').value = settings.kapasitas || 50;
+            document.getElementById('setJenisOli').value = settings.jenis_oli || 'ISO VG 46';
+            document.getElementById('setViskositasIdeal').value = settings.viskositas_ideal || 46;
+            
+            document.getElementById('setOffVis').value = settings.offset_viskositas || 0;
+            document.getElementById('setOffSuhu').value = settings.offset_suhu || 0;
+            document.getElementById('setOffGetaran').value = settings.offset_getaran || 0;
+            document.getElementById('setOffKadar').value = settings.offset_kadar_air || 0;
+
+            showSettingMessage('✅ Data loaded!', 'success');
+        }
+
+        function resetFullSetting() {
+            if (!confirm('⚠️ Reset semua data ke default untuk equipment ini?')) return;
+            
+            const deviceId = settingDeviceId;
+            if (!deviceId) return;
+
+            const settings = getEquipmentSettings();
+            delete settings[deviceId];
+            saveEquipmentSettings(settings);
+
+            loadFullSetting();
+            showSettingMessage('✅ Data direset ke default!', 'success');
+            
+            if (selectedDeviceId === deviceId) {
+                selectDevice(deviceId);
+            }
+        }
+
+        function saveFullSetting() {
+            const deviceId = settingDeviceId;
+            if (!deviceId) return;
+
+            const data = {
+                // Parameter Sensor
+                viskositas_min: parseFloat(document.getElementById('setVisMin').value) || 38,
+                viskositas_max: parseFloat(document.getElementById('setVisMax').value) || 50,
+                suhu_max: parseFloat(document.getElementById('setSuhuMax').value) || 95,
+                getaran_max: parseFloat(document.getElementById('setGetaranMax').value) || 8,
+                kadar_air_max: parseFloat(document.getElementById('setKadarAirMax').value) || 0.3,
+                level_oli_min: parseFloat(document.getElementById('setLevelOliMin').value) || 30,
+                // Data Equipment
+                kapasitas: parseFloat(document.getElementById('setKapasitas').value) || 50,
+                jenis_oli: document.getElementById('setJenisOli').value.trim() || 'ISO VG 46',
+                viskositas_ideal: parseFloat(document.getElementById('setViskositasIdeal').value) || 46,
+                // Kalibrasi Offset
+                offset_viskositas: parseFloat(document.getElementById('setOffVis').value) || 0,
+                offset_suhu: parseFloat(document.getElementById('setOffSuhu').value) || 0,
+                offset_getaran: parseFloat(document.getElementById('setOffGetaran').value) || 0,
+                offset_kadar_air: parseFloat(document.getElementById('setOffKadar').value) || 0
+            };
+
+            // Simpan semua ke localStorage
+            Object.keys(data).forEach(key => {
+                setSetting(deviceId, key, data[key]);
+            });
+
+            showSettingMessage('✅ Semua data equipment berhasil disimpan!', 'success');
+            
+            if (selectedDeviceId === deviceId) {
+                selectDevice(deviceId);
+            }
+
+            setTimeout(() => {
+                closeSettingModal();
+            }, 1500);
+        }
+
+        function showSettingMessage(msg, type) {
+            const el = document.getElementById('settingMessage');
+            el.textContent = msg;
+            el.className = 'mb-3 p-2 rounded-lg text-[11px] text-center ' + (type === 'success' ? 'text-[#00e676] bg-green-500/10 border border-green-500/20' : 'text-[#ffd54f] bg-yellow-500/10 border border-yellow-500/20');
+            el.classList.remove('hidden');
+        }
+
+        // ==========================================
+        //  TOAST NOTIFICATION
+        // ==========================================
+        function showToast(msg, type) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-medium z-50 animate-fadeIn ' +
+                (type === 'warning' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20' : 'bg-green-500/20 text-green-400 border border-green-500/20');
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        // ==========================================
+        //  KONFIGURASI MQTT
+        // ==========================================
+        const MQTT_BROKER = 'wss://test.mosquitto.org:8081/mqtt';
+        const MQTT_TOPIC = 'lubrikasi/sensor/data';
+        const MQTT_CLIENT_ID = 'dashboard_' + Math.random().toString(16).substr(2, 6);
+
+        // ==========================================
+        //  STATE
+        // ==========================================
+        let deviceData = {};
+        let alarmLog = [];
+        let chartInstance = null;
+        let dummyInterval = null;
+        let selectedDeviceId = null;
+        let currentChartDevice = 'global';
+
+        // ==========================================
+        //  DOM REFS
+        // ==========================================
+        const $ = id => document.getElementById(id);
+        const deviceGrid = $('deviceGrid');
+        const alarmList = $('alarmList');
+        const mqttStatus = $('mqttStatus');
+
+        // ==========================================
+        //  CHART
+        // ==========================================
+        function initChart(deviceId) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            let data;
+            if (deviceId && deviceId !== 'global') {
+                data = getHistoricalData(deviceId);
+                document.getElementById('chartDeviceLabel').textContent = deviceData[deviceId]?.device_name || deviceId;
+            } else {
+                data = { labels: [], viskositas: [], suhu: [] };
+                document.getElementById('chartDeviceLabel').textContent = 'Global';
+            }
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        label: 'Viskositas (cSt)',
+                        data: data.viskositas || [],
+                        borderColor: '#00c8a0',
+                        backgroundColor: 'rgba(0, 200, 160, 0.08)',
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        fill: true,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Suhu Oli (°C)',
+                        data: data.suhu || [],
+                        borderColor: '#ff6b6b',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        borderDash: [5, 4],
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#8da0c0',
+                                font: { size: 9, weight: '400' },
+                                boxWidth: 10,
+                                padding: 8
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#4a5a7a', font: { size: 8 }, maxTicksLimit: 12 },
+                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
+                        },
+                        y: {
+                            position: 'left',
+                            min: 30,
+                            max: 55,
+                            ticks: { color: '#4a5a7a', font: { size: 8 } },
+                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
+                            title: { display: true, text: 'cSt', color: '#4a5a7a', font: { size: 8 } }
+                        },
+                        y1: {
+                            position: 'right',
+                            min: 50,
+                            max: 120,
+                            ticks: { color: '#4a5a7a', font: { size: 8 } },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '°C', color: '#4a5a7a', font: { size: 8 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(deviceId, viskositas, suhu) {
+            let data;
+            if (deviceId && deviceId !== 'global') {
+                data = getHistoricalData(deviceId);
+                data.labels.push('');
+                data.viskositas.push(viskositas);
+                data.suhu.push(suhu);
+                if (data.labels.length > 60) {
+                    data.labels.shift();
+                    data.viskositas.shift();
+                    data.suhu.shift();
+                }
+                saveHistoricalData(deviceId, data);
+            } else {
+                const devices = Object.values(deviceData);
+                if (devices.length > 0) {
+                    const primaryDevice = devices[0];
+                    const globalData = getHistoricalData('global');
+                    globalData.labels.push('');
+                    globalData.viskositas.push(primaryDevice.viskositas || 0);
+                    globalData.suhu.push(primaryDevice.suhu || 0);
+                    if (globalData.labels.length > 60) {
+                        globalData.labels.shift();
+                        globalData.viskositas.shift();
+                        globalData.suhu.shift();
+                    }
+                    saveHistoricalData('global', globalData);
+                    data = globalData;
+                } else {
+                    return;
+                }
+            }
+
+            if (chartInstance) {
+                chartInstance.data.labels = data.labels;
+                chartInstance.data.datasets[0].data = data.viskositas;
+                chartInstance.data.datasets[1].data = data.suhu;
+                chartInstance.update();
+            }
+        }
+
+        // ==========================================
+        //  RENDER DEVICE
+        // ==========================================
+        function renderDevices() {
+            const devices = Object.values(deviceData);
+            if (devices.length === 0) {
+                deviceGrid.innerHTML =
+                    `<div class="text-center text-[#4a5a7a] text-xs py-8">Menunggu data perangkat...</div>`;
+                $('deviceTotal').textContent = '0 devices';
+                return;
+            }
+
+            let totalNormal = 0, totalWarning = 0, totalCritical = 0, totalOffline = 0;
+            const now = Date.now();
+            const OFFLINE_TIMEOUT = 30000;
+
+            devices.forEach(d => {
+                const lastUpdate = d.timestamp || 0;
+                const isOnline = (now - lastUpdate) < OFFLINE_TIMEOUT;
+                d.isOnline = isOnline;
+                
+                if (!isOnline) {
+                    totalOffline++;
+                    d.status = 'gray';
+                } else if (d.status === 'kritis') {
+                    totalCritical++;
+                } else if (d.status === 'peringatan') {
+                    totalWarning++;
+                } else {
+                    totalNormal++;
+                }
+            });
+
+            $('deviceTotal').textContent = `${devices.length} devices · ${totalCritical}⚠️ · ${totalOffline}⚪`;
+
+            const statusBadgeColor = {
+                'normal': 'bg-green-500/20 text-green-400',
+                'peringatan': 'bg-yellow-500/20 text-yellow-400',
+                'kritis': 'bg-red-500/20 text-red-400 animate-pulse',
+                'gray': 'bg-white/5 text-[#4a5a7a] offline-badge'
+            };
+
+            const statusLabel = {
+                'normal': 'Normal',
+                'peringatan': 'Peringatan',
+                'kritis': 'KRITIS!',
+                'gray': 'Offline'
+            };
+
+            const statusEmoji = {
+                'normal': '✅',
+                'peringatan': '⚠️',
+                'kritis': '🔴',
+                'gray': '⚪'
+            };
+
+            deviceGrid.innerHTML = devices.map(d => {
+                const statusClass = d.status || 'gray';
+                const isOnline = d.isOnline !== false;
+                const statusDotClass = {
+                    'normal': isOnline ? 'green' : 'gray',
+                    'peringatan': isOnline ? 'yellow' : 'gray',
+                    'kritis': isOnline ? 'red' : 'gray',
+                    'gray': 'gray'
+                } [statusClass] || 'gray';
+
+                const tempDisplay = d.suhu ? d.suhu.toFixed(1) + '°C' : '--';
+                const viscoDisplay = d.viskositas ? d.viskositas.toFixed(1) + ' cSt' : '--';
+                const isActive = selectedDeviceId === d.device_id ? 'active' : '';
+                const onlineText = isOnline ? '🟢 Online' : '⚪ Offline';
+
+                return `
+                    <div class="device-item status-${statusClass} ${isActive} bg-white/5 rounded-[10px] px-4 py-2.5 border-l-4 border-[#4a5a7a] flex items-center justify-between" onclick="selectDevice('${d.device_id}')">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <span class="status-dot-sm ${statusDotClass} flex-shrink-0"></span>
+                            <span class="dev-name text-[11px] font-medium text-[#b0c4e0] truncate">${d.device_name || 'Device'}</span>
+                            <span class="text-[7px] ${isOnline ? 'text-[#00e676]' : 'text-[#4a5a7a] offline-badge'} hidden sm:inline">${onlineText}</span>
+                        </div>
+                        <div class="flex items-center gap-4 flex-shrink-0">
+                            <span class="dev-visco text-[13px] font-semibold text-[#e8edf5]">${viscoDisplay}</span>
+                            <span class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</span>
+                            <span class="status-badge text-[8px] px-2 py-0.5 rounded-full ${statusBadgeColor[statusClass]} hidden md:inline">${statusLabel[statusClass]}</span>
+                            <span class="text-[10px]">${statusEmoji[statusClass]}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            $('deviceCount').textContent = devices.length + ' Perangkat Terhubung';
+        }
+
+        // ==========================================
+        //  RENDER ALARM - TIDAK ADA BATASAN
+        // ==========================================
+        function renderAlarms() {
+            if (alarmLog.length === 0) {
+                alarmList.innerHTML =
+                    `<div class="text-center text-[#4a5a7a] text-xs py-5">✅ Semua sistem normal</div>`;
+                $('alarmCount').textContent = '0 alarm';
+                return;
+            }
+
+            // Tampilkan SEMUA alarm (diurutkan dari yang terbaru) - TIDAK ADA BATASAN
+            alarmList.innerHTML = alarmLog.map(a => `
+                <div class="alarm-item flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border-l-[3px] border-[#4a5a7a] text-[11px] flex-shrink-0 ${a.level}">
+                    <span class="alarm-time text-[#6b7d9c] text-[9px] min-w-[36px]">${a.time}</span>
+                    <span class="alarm-msg flex-1 text-[#c8d6e8] text-[10px] truncate">${a.message}</span>
+                    <span class="alarm-device font-medium text-[#8da0c0] text-[9px] bg-white/5 px-2 py-0.5 rounded-full whitespace-nowrap">${a.device}</span>
+                </div>
+            `).join('');
+
+            $('alarmCount').textContent = alarmLog.length + ' alarm';
+        }
+
+        // ==========================================
+        //  UPDATE KPI
+        // ==========================================
+        function updateKPI() {
+            const devices = Object.values(deviceData);
+            if (devices.length === 0) return;
+
+            let totalHealth = 0;
+            let totalLevel = 0;
+            let kritis = 0, peringatan = 0, offline = 0;
+            const now = Date.now();
+            const OFFLINE_TIMEOUT = 30000;
+
+            devices.forEach(d => {
+                const isOnline = (now - (d.timestamp || 0)) < OFFLINE_TIMEOUT;
+                if (!isOnline) {
+                    offline++;
+                    totalHealth += 40;
+                } else if (d.status === 'normal') {
+                    totalHealth += 100;
+                } else if (d.status === 'peringatan') {
+                    totalHealth += 60;
+                    peringatan++;
+                } else if (d.status === 'kritis') {
+                    totalHealth += 20;
+                    kritis++;
+                }
+                if (d.level_oli) totalLevel += d.level_oli;
+            });
+
+            const activeDevices = devices.length - offline;
+            const avgHealth = devices.length > 0 ? Math.round(totalHealth / devices.length) : 0;
+            const avgLevel = devices.length > 0 ? Math.round(totalLevel / devices.length) : 0;
+
+            $('kpiKesehatan').textContent = avgHealth + '%';
+            $('kpiKesehatanSub').textContent = `${activeDevices} perangkat aktif`;
+
+            $('kpiStok').innerHTML = avgLevel + ' <span style="font-size:14px;color:#6b7d9c;">L</span>';
+            $('kpiStokSub').textContent = `⏳ Rata-rata level ${avgLevel}%`;
+
+            const totalAlarm = kritis + peringatan;
+            $('kpiAlarm').textContent = totalAlarm;
+            $('kpiAlarmSub').textContent = `● ${kritis} Kritis · ${peringatan} Peringatan · ${offline} Offline`;
+
+            const card = $('kpiAlarmCard');
+            card.className = 'kpi-card bg-white/5 rounded-[14px] p-[14px_16px] border border-white/5' + (kritis > 0 ? ' danger' : peringatan > 0 ? ' warning' : ' success');
+
+            $('alarmBadge').textContent = `🔔 ${totalAlarm}`;
+            $('alarmBadge').style.background = totalAlarm > 0 ? 'rgba(255,80,80,0.15)' : 'rgba(255,200,0,0.15)';
+            $('alarmBadge').style.color = totalAlarm > 0 ? '#ff6b6b' : '#ffd54f';
+
+            const savings = (devices.length * 12.5 + Math.random() * 5).toFixed(1);
+            $('kpiBiaya').textContent = 'Rp ' + savings + ' Jt';
+            $('kpiBiayaSub').textContent = `📈 +${(Math.random()*15+5).toFixed(1)}% dari bulan lalu`;
+
+            const mtbf = (10 + devices.length * 0.8 + Math.random() * 3).toFixed(1);
+            $('kpiMtbf').innerHTML = mtbf + ' <span style="font-size:14px;color:#6b7d9c;">bln</span>';
+            $('kpiMtbfSub').textContent = `📈 +${(devices.length*3+10).toFixed(0)}% sejak implementasi`;
+        }
+
+        // ==========================================
+        //  SELECT DEVICE
+        // ==========================================
+        function selectDevice(deviceId) {
+            const d = deviceData[deviceId];
+            if (!d) return;
+
+            selectedDeviceId = deviceId;
+            renderDevices();
+
+            const histData = getHistoricalData(deviceId);
+            if (histData.labels.length > 0) {
+                if (chartInstance) {
+                    chartInstance.data.labels = histData.labels;
+                    chartInstance.data.datasets[0].data = histData.viskositas;
+                    chartInstance.data.datasets[1].data = histData.suhu;
+                    chartInstance.update();
+                }
+                document.getElementById('chartDeviceLabel').textContent = d.device_name || deviceId;
+            } else {
+                if (chartInstance) {
+                    chartInstance.data.labels = [];
+                    chartInstance.data.datasets[0].data = [];
+                    chartInstance.data.datasets[1].data = [];
+                    chartInstance.update();
+                }
+                document.getElementById('chartDeviceLabel').textContent = d.device_name || deviceId;
+            }
+
+            $('detailDeviceName').textContent = d.device_name || 'Device ' + deviceId;
+
+            const statusMap = {
+                'normal': '✅ Normal',
+                'peringatan': '⚠️ Peringatan',
+                'kritis': '🔴 KRITIS',
+                'gray': '⏳ Offline'
+            };
+            const statusColor = {
+                'normal': '#00e676',
+                'peringatan': '#ffd54f',
+                'kritis': '#ff6b6b',
+                'gray': '#4a5a7a'
+            };
+            $('detailStatus').textContent = statusMap[d.status] || '--';
+            $('detailStatus').style.color = statusColor[d.status] || '#4a5a7a';
+
+            const setDetail = (id, val, unit = '') => {
+                const el = $(id);
+                if (el) {
+                    if (val !== undefined && val !== null && !isNaN(val)) {
+                        el.textContent = val.toFixed(2) + unit;
+                    } else {
+                        el.textContent = '--';
+                    }
+                }
+            };
+
+            setDetail('dViskositas', d.viskositas, ' cSt');
+            setDetail('dSuhu', d.suhu, '°C');
+            setDetail('dGetaran', d.getaran, ' mm/s');
+            setDetail('dKadarAir', d.kadar_air, '%');
+            setDetail('dLevelOli', d.level_oli, '%');
+            setDetail('dTekananFilter', d.tekanan_filter, ' bar');
+
+            const deviceIdStr = String(deviceId);
+            const settings = getFullSetting(deviceIdStr);
+
+            // ===== MAC & IP dari data device =====
+            document.getElementById('dMacAddress').textContent = d.mac_address || '--';
+            document.getElementById('dIpAddress').textContent = d.ip_address || '--';
+            document.getElementById('dKapasitas').textContent = settings.kapasitas ? settings.kapasitas + ' L' : '--';
+            
+            const runningData = getRunningHours(deviceIdStr);
+            if (runningData) {
+                document.getElementById('dRunningHours').textContent = formatRunningHours(runningData.total_seconds);
+                document.getElementById('dRunningHours').style.color = '#00c8a0';
+            } else {
+                const newData = getRunningHoursData();
+                newData[deviceIdStr] = {
+                    last_reset: Date.now(),
+                    total_seconds: 0,
+                    last_known: 0
+                };
+                saveRunningHoursData(newData);
+                document.getElementById('dRunningHours').textContent = '0 jam (mulai)';
+                document.getElementById('dRunningHours').style.color = '#ffd54f';
+            }
+            
+            document.getElementById('dViskositasIdeal').textContent = settings.viskositas_ideal ? settings.viskositas_ideal + ' cSt' : '--';
+            document.getElementById('dJenisOli').textContent = settings.jenis_oli || '--';
+
+            ['dViskositas', 'dSuhu', 'dGetaran', 'dKadarAir', 'dLevelOli', 'dTekananFilter'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.className = 'value font-medium text-[#e8edf5] transition-all duration-300';
+                    if (id === 'dViskositas' && d.viskositas < settings.viskositas_min) el.classList.add('highlight-red');
+                    else if (id === 'dViskositas' && d.viskositas > settings.viskositas_max) el.classList.add('highlight-red');
+                    else if (id === 'dSuhu' && d.suhu > settings.suhu_max) el.classList.add('highlight-red');
+                    else if (id === 'dSuhu' && d.suhu > settings.suhu_max - 5) el.classList.add('highlight-yellow');
+                    else if (id === 'dGetaran' && d.getaran > settings.getaran_max) el.classList.add('highlight-red');
+                    else if (id === 'dGetaran' && d.getaran > settings.getaran_max - 2) el.classList.add('highlight-yellow');
+                    else if (id === 'dKadarAir' && d.kadar_air > settings.kadar_air_max) el.classList.add('highlight-red');
+                    else if (id === 'dKadarAir' && d.kadar_air > settings.kadar_air_max - 0.1) el.classList.add('highlight-yellow');
+                    else if (id === 'dLevelOli' && d.level_oli < settings.level_oli_min) el.classList.add('highlight-red');
+                    else if (id === 'dLevelOli' && d.level_oli < settings.level_oli_min + 10) el.classList.add('highlight-yellow');
+                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.5) el.classList.add('highlight-red');
+                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.0) el.classList.add('highlight-yellow');
+                    else el.classList.add('highlight-green');
+                }
+            });
+
+            let rekomendasi = '✅ Kondisi normal, pantau secara rutin.';
+            if (d.status === 'kritis') {
+                rekomendasi = '🚨 KRITIS! Lakukan shutdown & inspeksi segera!';
+            } else if (d.status === 'peringatan') {
+                if (d.getaran > 5) rekomendasi = '⚠️ Getaran tinggi, periksa bearing & alignment.';
+                else if (d.suhu > 90) rekomendasi = '⚠️ Suhu tinggi, periksa level oli & pendingin.';
+                else if (d.kadar_air > 0.2) rekomendasi = '⚠️ Kadar air tinggi, lakukan purifikasi oli.';
+                else if (d.level_oli < 40) rekomendasi = '⚠️ Level oli rendah, lakukan top-up.';
+                else rekomendasi = '⚠️ Periksa parameter yang menyimpang.';
+            }
+
+            if (settings.viskositas_ideal && d.viskositas) {
+                const diff = Math.abs(d.viskositas - settings.viskositas_ideal);
+                if (diff > 5 && d.status !== 'kritis') {
+                    rekomendasi += ' 📉 Viskositas menyimpang ' + diff.toFixed(1) + ' cSt dari ideal (' + settings.viskositas_ideal + ' cSt).';
+                }
+            }
+
+            $('dRekomendasi').textContent = '💡 ' + rekomendasi;
+        }
+
+        // ==========================================
+        //  PROSES DATA - DENGAN MAC & IP
+        // ==========================================
+        function processData(payload) {
+            try {
+                const data = JSON.parse(payload);
+                const deviceId = data.device_id || 'unknown';
+                const deviceIdStr = String(deviceId);
+
+                const savedDevices = getPersistentDevices();
+                let existingData = savedDevices[deviceIdStr] || null;
+
+                const now = Date.now();
+
+                // ===== MAC & IP dari payload =====
+                const macAddress = data.mac_address || '--';
+                const ipAddress = data.ip_address || '--';
+
+                if (!existingData) {
+                    const newDevice = {
+                        device_id: deviceId,
+                        device_name: data.device_name || 'Device-' + deviceId,
+                        status: data.status || 'normal',
+                        viskositas: data.viskositas || 0,
+                        suhu: data.suhu || 0,
+                        getaran: data.getaran || 0,
+                        kadar_air: data.kadar_air || 0,
+                        level_oli: data.level_oli || 0,
+                        tekanan_filter: data.tekanan_filter || 0,
+                        mac_address: macAddress,
+                        ip_address: ipAddress,
+                        timestamp: now,
+                        first_seen: now,
+                        isOnline: true
+                    };
+                    savedDevices[deviceIdStr] = newDevice;
+                    savePersistentDevices(savedDevices);
+                    
+                    const runningData = getRunningHoursData();
+                    if (!runningData[deviceIdStr]) {
+                        runningData[deviceIdStr] = {
+                            last_reset: now,
+                            total_seconds: 0,
+                            last_known: 0
+                        };
+                        saveRunningHoursData(runningData);
+                    }
+                    
+                    const histData = getHistoricalData(deviceIdStr);
+                    if (histData.labels.length === 0) {
+                        const now2 = new Date();
+                        for (let i = 0; i < 10; i++) {
+                            const t = new Date(now2.getTime() - (10 - i) * 6000);
+                            histData.labels.push(t.getHours().toString().padStart(2, '0') + ':' + 
+                                t.getMinutes().toString().padStart(2, '0') + ':' + 
+                                t.getSeconds().toString().padStart(2, '0'));
+                            histData.viskositas.push(data.viskositas || 46);
+                            histData.suhu.push(data.suhu || 70);
+                        }
+                        saveHistoricalData(deviceIdStr, histData);
+                    }
+                } else {
+                    savedDevices[deviceIdStr] = {
+                        ...existingData,
+                        status: data.status || existingData.status || 'normal',
+                        viskositas: data.viskositas || existingData.viskositas || 0,
+                        suhu: data.suhu || existingData.suhu || 0,
+                        getaran: data.getaran || existingData.getaran || 0,
+                        kadar_air: data.kadar_air || existingData.kadar_air || 0,
+                        level_oli: data.level_oli || existingData.level_oli || 0,
+                        tekanan_filter: data.tekanan_filter || existingData.tekanan_filter || 0,
+                        mac_address: macAddress,
+                        ip_address: ipAddress,
+                        timestamp: now,
+                        device_name: data.device_name || existingData.device_name || 'Device-' + deviceId,
+                        isOnline: true
+                    };
+                    savePersistentDevices(savedDevices);
+                }
+
+                deviceData = savedDevices;
+
+                if (data.viskositas !== undefined && data.suhu !== undefined) {
+                    const histData = getHistoricalData(deviceIdStr);
+                    const now2 = new Date();
+                    const label = now2.getHours().toString().padStart(2, '0') + ':' +
+                        now2.getMinutes().toString().padStart(2, '0') + ':' +
+                        now2.getSeconds().toString().padStart(2, '0');
+                    histData.labels.push(label);
+                    histData.viskositas.push(data.viskositas);
+                    histData.suhu.push(data.suhu);
+                    if (histData.labels.length > 60) {
+                        histData.labels.shift();
+                        histData.viskositas.shift();
+                        histData.suhu.shift();
+                    }
+                    saveHistoricalData(deviceIdStr, histData);
+
+                    if (selectedDeviceId && String(selectedDeviceId) === deviceIdStr) {
+                        if (chartInstance) {
+                            chartInstance.data.labels = histData.labels;
+                            chartInstance.data.datasets[0].data = histData.viskositas;
+                            chartInstance.data.datasets[1].data = histData.suhu;
+                            chartInstance.update();
+                        }
+                    }
+                }
+
+                const d = deviceData[deviceIdStr];
+                if (d) {
+                    const now2 = new Date();
+                    const timeStr = now2.getHours().toString().padStart(2, '0') + ':' +
+                        now2.getMinutes().toString().padStart(2, '0');
+
+                    if (d.status === 'kritis') {
+                        alarmLog.unshift({
+                            time: timeStr,
+                            level: 'critical',
+                            message: `🔴 KRITIS: ${d.device_name} - Getaran ${d.getaran.toFixed(2)} mm/s, Suhu ${d.suhu.toFixed(2)}°C`,
+                            device: d.device_name
+                        });
+                    } else if (d.status === 'peringatan') {
+                        let msg = `⚠️ Peringatan: ${d.device_name} - `;
+                        if (d.getaran > 5) msg += `Getaran ${d.getaran.toFixed(2)} mm/s`;
+                        else if (d.suhu > 90) msg += `Suhu ${d.suhu.toFixed(2)}°C`;
+                        else if (d.kadar_air > 0.2) msg += `Kadar air ${d.kadar_air.toFixed(2)}%`;
+                        else if (d.level_oli < 40) msg += `Level oli ${d.level_oli.toFixed(2)}%`;
+                        else msg += `Parameter abnormal`;
+                        alarmLog.unshift({ time: timeStr, level: 'warning-item', message: msg, device: d.device_name });
+                    }
+                }
+
+                // TIDAK ADA BATASAN ALARM LOG
+                // if (alarmLog.length > 100) alarmLog.length = 100;
+
+                renderDevices();
+                renderAlarms();
+                updateKPI();
+
+                const now2 = new Date();
+                $('lastUpdate').textContent = 'Terakhir update: ' + now2.toLocaleTimeString('id-ID', { hour12: false });
+
+                const firstDevice = Object.values(deviceData)[0];
+                if (firstDevice && !selectedDeviceId) {
+                    selectDevice(firstDevice.device_id);
+                } else if (selectedDeviceId && deviceData[selectedDeviceId]) {
+                    selectDevice(selectedDeviceId);
+                } else if (firstDevice) {
+                    selectDevice(firstDevice.device_id);
+                }
+
+            } catch (e) {
+                console.warn('Gagal parse data:', e);
+            }
+        }
+
+        // ==========================================
+        //  MQTT KONEKSI
+        // ==========================================
+        function connectMQTT() {
+            mqttStatus.textContent = '⏳ Menghubungkan...';
+            mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+
+            const client = mqtt.connect(MQTT_BROKER, {
+                clientId: MQTT_CLIENT_ID,
+                clean: true,
+                reconnectPeriod: 3000
+            });
+
+            client.on('connect', () => {
+                console.log('✅ MQTT Terhubung ke test.mosquitto.org!');
+                mqttStatus.textContent = '✅ Terhubung';
+                mqttStatus.className = 'mqtt-status text-[11px] px-[14px] py-1 rounded-[30px] border';
+                client.subscribe(MQTT_TOPIC, (err) => {
+                    if (!err) console.log('📡 Subscribe ke:', MQTT_TOPIC);
+                });
+                client.publish('lubrikasi/status', 'Dashboard online');
+            });
+
+            client.on('message', (topic, message) => {
+                if (topic === MQTT_TOPIC) {
+                    processData(message.toString());
+                }
+            });
+
+            client.on('error', (err) => {
+                console.warn('MQTT Error:', err);
+                mqttStatus.textContent = '❌ Error';
+                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+            });
+
+            client.on('close', () => {
+                console.warn('MQTT Terputus');
+                mqttStatus.textContent = '⏳ Terputus...';
+                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
+            });
+        }
+
+        // ==========================================
+        //  GENERATE DATA DUMMY - DENGAN MAC & IP
+        // ==========================================
+        function generateDummyData() {
+            const deviceId = Math.floor(Math.random() * 10) + 1;
+            const names = ['GB-01', 'GB-02', 'GB-03', 'GB-04', 'GB-05', 'GB-06', 'GB-07', 'GB-08', 'GB-09', 'GB-10'];
+            
+            // Generate MAC Address dummy
+            const mac = '24:6F:28:' + 
+                Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase() + ':' +
+                Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase() + ':' +
+                Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase();
+            
+            // Generate IP Address dummy
+            const ip = '192.168.1.' + (Math.floor(Math.random() * 50) + 10);
+
+            const data = {
+                device_id: deviceId,
+                device_name: names[deviceId - 1],
+                timestamp: Date.now(),
+                viskositas: parseFloat((46 - Math.random() * 8).toFixed(2)),
+                suhu: parseFloat((68 + Math.random() * 20).toFixed(2)),
+                getaran: parseFloat((2 + Math.random() * 5).toFixed(2)),
+                kadar_air: parseFloat((0.02 + Math.random() * 0.25).toFixed(3)),
+                level_oli: parseFloat((85 - Math.random() * 25).toFixed(1)),
+                tekanan_filter: parseFloat((1.2 + Math.random() * 1.5).toFixed(2)),
+                status: Math.random() > 0.85 ? 'kritis' : Math.random() > 0.7 ? 'peringatan' : 'normal',
+                mac_address: mac,
+                ip_address: ip
+            };
+
+            processData(JSON.stringify(data));
+        }
+
+        // ==========================================
+        //  INIT DASHBOARD
+        // ==========================================
+        function initDashboard() {
+            const savedDevices = getPersistentDevices();
+            if (Object.keys(savedDevices).length > 0) {
+                deviceData = savedDevices;
+                renderDevices();
+                updateKPI();
+                const firstDevice = Object.values(deviceData)[0];
+                if (firstDevice) {
+                    selectDevice(firstDevice.device_id);
+                }
+            }
+
+            const firstDevice = Object.values(deviceData)[0];
+            if (firstDevice) {
+                const histData = getHistoricalData(firstDevice.device_id);
+                if (histData.labels.length > 0) {
+                    document.getElementById('chartDeviceLabel').textContent = firstDevice.device_name;
+                    initChart(firstDevice.device_id);
+                } else {
+                    initChart('global');
+                }
+            } else {
+                initChart('global');
+            }
+
+            connectMQTT();
+
+            if (!dummyInterval) {
+                dummyInterval = setInterval(generateDummyData, 3000);
+            }
+            setTimeout(() => {
+                generateDummyData();
+            }, 100);
+
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            updateRunningHours();
+            setInterval(updateRunningHours, 10000);
+
+            setInterval(() => {
+                const now = Date.now();
+                const OFFLINE_TIMEOUT = 30000;
+                let updated = false;
+                
+                Object.keys(deviceData).forEach(id => {
+                    const device = deviceData[id];
+                    const isOnline = (now - (device.timestamp || 0)) < OFFLINE_TIMEOUT;
+                    if (device.isOnline !== isOnline) {
+                        device.isOnline = isOnline;
+                        if (!isOnline) {
+                            device.status = 'gray';
+                        }
+                        updated = true;
+                    }
+                });
+
+                if (updated) {
+                    savePersistentDevices(deviceData);
+                    renderDevices();
+                    updateKPI();
+                }
+            }, 10000);
+        }
+
+        // ==========================================
+        //  INIT
+        // ==========================================
         function handleLogin(event) {
             event.preventDefault();
 
@@ -470,11 +1762,6 @@
             deviceData = {};
             alarmLog = [];
             selectedDeviceId = null;
-            if (chartData) {
-                chartData.labels = [];
-                chartData.viskositas = [];
-                chartData.suhu = [];
-            }
             if (chartInstance) {
                 chartInstance.destroy();
                 chartInstance = null;
@@ -482,512 +1769,11 @@
             location.reload();
         }
 
-        // ==========================================
-        //  KONFIGURASI MQTT
-        // ==========================================
-        const MQTT_BROKER = 'wss://test.mosquitto.org:8081/mqtt';
-        const MQTT_TOPIC = 'lubrikasi/sensor/data';
-        const MQTT_CLIENT_ID = 'dashboard_' + Math.random().toString(16).substr(2, 6);
-
-        // ==========================================
-        //  STATE
-        // ==========================================
-        let deviceData = {};
-        let alarmLog = [];
-        let chartData = {
-            labels: [],
-            viskositas: [],
-            suhu: []
-        };
-        let chartInstance = null;
-        let dummyInterval = null;
-        let selectedDeviceId = null;
-
-        // ==========================================
-        //  DOM REFS
-        // ==========================================
-        const $ = id => document.getElementById(id);
-        const deviceGrid = $('deviceGrid');
-        const alarmList = $('alarmList');
-        const mqttStatus = $('mqttStatus');
-
-        // ==========================================
-        //  INIT DASHBOARD
-        // ==========================================
-        function initDashboard() {
-            initChart();
-            connectMQTT();
-
-            setTimeout(() => {
-                if (Object.keys(deviceData).length === 0) {
-                    console.log('⚠️ Tidak ada data dari MQTT, aktifkan dummy generator');
-                    if (!dummyInterval) {
-                        dummyInterval = setInterval(generateDummyData, 3000);
-                    }
-                }
-            }, 10000);
-
-            updateClock();
-            setInterval(updateClock, 1000);
-        }
-
-        // ==========================================
-        //  CLOCK
-        // ==========================================
         function updateClock() {
             const now = new Date();
             $('clockDisplay').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
         }
 
-        // ==========================================
-        //  CHART
-        // ==========================================
-        function initChart() {
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.labels,
-                    datasets: [{
-                        label: 'Viskositas (cSt)',
-                        data: chartData.viskositas,
-                        borderColor: '#00c8a0',
-                        backgroundColor: 'rgba(0, 200, 160, 0.08)',
-                        borderWidth: 2.5,
-                        pointRadius: 0,
-                        tension: 0.3,
-                        fill: true,
-                        yAxisID: 'y'
-                    }, {
-                        label: 'Suhu Oli (°C)',
-                        data: chartData.suhu,
-                        borderColor: '#ff6b6b',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.3,
-                        borderDash: [5, 4],
-                        yAxisID: 'y1'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#8da0c0',
-                                font: { size: 9, weight: '400' },
-                                boxWidth: 10,
-                                padding: 8
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { color: '#4a5a7a', font: { size: 8 }, maxTicksLimit: 12 },
-                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
-                        },
-                        y: {
-                            position: 'left',
-                            min: 30,
-                            max: 55,
-                            ticks: { color: '#4a5a7a', font: { size: 8 } },
-                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-                            title: { display: true, text: 'cSt', color: '#4a5a7a', font: { size: 8 } }
-                        },
-                        y1: {
-                            position: 'right',
-                            min: 50,
-                            max: 120,
-                            ticks: { color: '#4a5a7a', font: { size: 8 } },
-                            grid: { drawOnChartArea: false },
-                            title: { display: true, text: '°C', color: '#4a5a7a', font: { size: 8 } }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateChart(viskositas, suhu) {
-            const now = new Date();
-            const label = now.getHours().toString().padStart(2, '0') + ':' +
-                now.getMinutes().toString().padStart(2, '0') + ':' +
-                now.getSeconds().toString().padStart(2, '0');
-
-            chartData.labels.push(label);
-            chartData.viskositas.push(viskositas);
-            chartData.suhu.push(suhu);
-
-            if (chartData.labels.length > 60) {
-                chartData.labels.shift();
-                chartData.viskositas.shift();
-                chartData.suhu.shift();
-            }
-
-            if (chartInstance) {
-                chartInstance.update();
-            }
-        }
-
-        // ==========================================
-        //  RENDER DEVICE - VERTIKAL DENGAN SCROLL
-        // ==========================================
-        function renderDevices() {
-            const devices = Object.values(deviceData);
-            if (devices.length === 0) {
-                deviceGrid.innerHTML =
-                    `<div class="text-center text-[#4a5a7a] text-xs py-8">Menunggu data perangkat...</div>`;
-                $('deviceTotal').textContent = '0 devices';
-                return;
-            }
-
-            // Hitung statistik
-            let totalNormal = 0, totalWarning = 0, totalCritical = 0, totalOffline = 0;
-            devices.forEach(d => {
-                if (d.status === 'normal') totalNormal++;
-                else if (d.status === 'peringatan') totalWarning++;
-                else if (d.status === 'kritis') totalCritical++;
-                else totalOffline++;
-            });
-
-            $('deviceTotal').textContent = `${devices.length} devices · ${totalCritical}⚠️`;
-
-            // Render vertical list
-            deviceGrid.innerHTML = devices.map(d => {
-                const statusClass = d.status || 'gray';
-                const statusDotClass = {
-                    'normal': 'green',
-                    'peringatan': 'yellow',
-                    'kritis': 'red',
-                    'gray': 'gray'
-                } [statusClass] || 'gray';
-
-                const tempDisplay = d.suhu ? d.suhu.toFixed(1) + '°C' : '--';
-                const viscoDisplay = d.viskositas ? d.viskositas.toFixed(1) + ' cSt' : '--';
-                const isActive = selectedDeviceId === d.device_id ? 'active' : '';
-
-                const statusLabel = {
-                    'normal': 'Normal',
-                    'peringatan': 'Peringatan',
-                    'kritis': 'KRITIS!',
-                    'gray': 'Offline'
-                } [statusClass] || '--';
-
-                const statusBadgeColor = {
-                    'normal': 'bg-green-500/20 text-green-400',
-                    'peringatan': 'bg-yellow-500/20 text-yellow-400',
-                    'kritis': 'bg-red-500/20 text-red-400 animate-pulse',
-                    'gray': 'bg-white/5 text-[#4a5a7a]'
-                } [statusClass] || 'bg-white/5 text-[#4a5a7a]';
-
-                return `
-                    <div class="device-item status-${statusClass} ${isActive} bg-white/5 rounded-[10px] px-4 py-2.5 border-l-4 border-[#4a5a7a] flex items-center justify-between" onclick="selectDevice('${d.device_id}')">
-                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <span class="status-dot-sm ${statusDotClass} flex-shrink-0"></span>
-                            <span class="dev-name text-[11px] font-medium text-[#b0c4e0] truncate">${d.device_name || 'Device'}</span>
-                        </div>
-                        <div class="flex items-center gap-4 flex-shrink-0">
-                            <span class="dev-visco text-[13px] font-semibold text-[#e8edf5]">${viscoDisplay}</span>
-                            <span class="dev-temp text-[13px] font-semibold text-[#e8edf5]">${tempDisplay}</span>
-                            <span class="status-badge text-[8px] px-2 py-0.5 rounded-full ${statusBadgeColor} hidden md:inline">${statusLabel}</span>
-                            <span class="text-[10px]">${statusClass === 'kritis' ? '🔴' : statusClass === 'peringatan' ? '⚠️' : '✅'}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            $('deviceCount').textContent = devices.length + ' Perangkat Terhubung';
-        }
-
-        // ==========================================
-        //  RENDER ALARM - SCROLL VERTIKAL, UPDATE TERBARU
-        // ==========================================
-        function renderAlarms() {
-            if (alarmLog.length === 0) {
-                alarmList.innerHTML =
-                    `<div class="text-center text-[#4a5a7a] text-xs py-5">✅ Semua sistem normal</div>`;
-                $('alarmCount').textContent = '0 alarm';
-                return;
-            }
-
-            // Tampilkan SEMUA alarm (diurutkan dari yang terbaru)
-            alarmList.innerHTML = alarmLog.map(a => `
-                <div class="alarm-item flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border-l-[3px] border-[#4a5a7a] text-[11px] flex-shrink-0 ${a.level}">
-                    <span class="alarm-time text-[#6b7d9c] text-[9px] min-w-[36px]">${a.time}</span>
-                    <span class="alarm-msg flex-1 text-[#c8d6e8] text-[10px] truncate">${a.message}</span>
-                    <span class="alarm-device font-medium text-[#8da0c0] text-[9px] bg-white/5 px-2 py-0.5 rounded-full whitespace-nowrap">${a.device}</span>
-                </div>
-            `).join('');
-
-            $('alarmCount').textContent = alarmLog.length + ' alarm';
-        }
-
-        // ==========================================
-        //  UPDATE KPI
-        // ==========================================
-        function updateKPI() {
-            const devices = Object.values(deviceData);
-            if (devices.length === 0) return;
-
-            let totalHealth = 0;
-            let totalLevel = 0;
-            let kritis = 0, peringatan = 0;
-
-            devices.forEach(d => {
-                if (d.status === 'normal') totalHealth += 100;
-                else if (d.status === 'peringatan') { totalHealth += 60; peringatan++; }
-                else if (d.status === 'kritis') { totalHealth += 20; kritis++; }
-                if (d.level_oli) totalLevel += d.level_oli;
-            });
-
-            const avgHealth = Math.round(totalHealth / devices.length);
-            const avgLevel = Math.round(totalLevel / devices.length);
-
-            $('kpiKesehatan').textContent = avgHealth + '%';
-            $('kpiKesehatanSub').textContent = `📊 ${devices.length} perangkat aktif`;
-
-            $('kpiStok').innerHTML = avgLevel + ' <span style="font-size:14px;color:#6b7d9c;">L</span>';
-            $('kpiStokSub').textContent = `⏳ Rata-rata level ${avgLevel}%`;
-
-            const totalAlarm = kritis + peringatan;
-            $('kpiAlarm').textContent = totalAlarm;
-            $('kpiAlarmSub').textContent = `● ${kritis} Kritis · ● ${peringatan} Peringatan`;
-
-            const card = $('kpiAlarmCard');
-            card.className = 'kpi-card bg-white/5 rounded-[14px] p-[14px_16px] border border-white/5' + (kritis > 0 ? ' danger' : peringatan > 0 ? ' warning' : ' success');
-
-            $('alarmBadge').textContent = `🔔 ${totalAlarm} Alarm`;
-            $('alarmBadge').style.background = totalAlarm > 0 ? 'rgba(255,80,80,0.15)' : 'rgba(255,200,0,0.15)';
-            $('alarmBadge').style.color = totalAlarm > 0 ? '#ff6b6b' : '#ffd54f';
-
-            const savings = (devices.length * 12.5 + Math.random() * 5).toFixed(1);
-            $('kpiBiaya').textContent = 'Rp ' + savings + ' Jt';
-            $('kpiBiayaSub').textContent = `📈 +${(Math.random()*15+5).toFixed(1)}% dari bulan lalu`;
-
-            const mtbf = (10 + devices.length * 0.8 + Math.random() * 3).toFixed(1);
-            $('kpiMtbf').innerHTML = mtbf + ' <span style="font-size:14px;color:#6b7d9c;">bln</span>';
-            $('kpiMtbfSub').textContent = `📈 +${(devices.length*3+10).toFixed(0)}% sejak implementasi`;
-        }
-
-        // ==========================================
-        //  SELECT DEVICE
-        // ==========================================
-        function selectDevice(deviceId) {
-            const d = deviceData[deviceId];
-            if (!d) return;
-
-            selectedDeviceId = deviceId;
-
-            // Re-render devices untuk update active state
-            renderDevices();
-
-            $('detailDeviceName').textContent = d.device_name || 'Device ' + deviceId;
-
-            const statusMap = {
-                'normal': '✅ Normal',
-                'peringatan': '⚠️ Peringatan',
-                'kritis': '🔴 KRITIS',
-                'gray': '⏳ Offline'
-            };
-            const statusColor = {
-                'normal': '#00e676',
-                'peringatan': '#ffd54f',
-                'kritis': '#ff6b6b',
-                'gray': '#4a5a7a'
-            };
-            $('detailStatus').textContent = statusMap[d.status] || '--';
-            $('detailStatus').style.color = statusColor[d.status] || '#4a5a7a';
-
-            const setDetail = (id, val, unit = '') => {
-                const el = $(id);
-                if (el) {
-                    if (val !== undefined && val !== null && !isNaN(val)) {
-                        el.textContent = val.toFixed(2) + unit;
-                    } else {
-                        el.textContent = '--';
-                    }
-                }
-            };
-
-            setDetail('dViskositas', d.viskositas, ' cSt');
-            setDetail('dSuhu', d.suhu, '°C');
-            setDetail('dGetaran', d.getaran, ' mm/s');
-            setDetail('dKadarAir', d.kadar_air, '%');
-            setDetail('dLevelOli', d.level_oli, '%');
-            setDetail('dTekananFilter', d.tekanan_filter, ' bar');
-
-            ['dViskositas', 'dSuhu', 'dGetaran', 'dKadarAir', 'dLevelOli', 'dTekananFilter'].forEach(id => {
-                const el = $(id);
-                if (el) {
-                    el.className = 'value font-medium text-[#e8edf5] transition-all duration-300';
-                    if (id === 'dViskositas' && d.viskositas < 40) el.classList.add('highlight-red');
-                    else if (id === 'dSuhu' && d.suhu > 95) el.classList.add('highlight-red');
-                    else if (id === 'dSuhu' && d.suhu > 85) el.classList.add('highlight-yellow');
-                    else if (id === 'dGetaran' && d.getaran > 8) el.classList.add('highlight-red');
-                    else if (id === 'dGetaran' && d.getaran > 5) el.classList.add('highlight-yellow');
-                    else if (id === 'dKadarAir' && d.kadar_air > 0.3) el.classList.add('highlight-red');
-                    else if (id === 'dKadarAir' && d.kadar_air > 0.15) el.classList.add('highlight-yellow');
-                    else if (id === 'dLevelOli' && d.level_oli < 30) el.classList.add('highlight-red');
-                    else if (id === 'dLevelOli' && d.level_oli < 50) el.classList.add('highlight-yellow');
-                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.5) el.classList.add('highlight-red');
-                    else if (id === 'dTekananFilter' && d.tekanan_filter > 2.0) el.classList.add('highlight-yellow');
-                    else el.classList.add('highlight-green');
-                }
-            });
-
-            let rekomendasi = '✅ Kondisi normal, pantau secara rutin.';
-            if (d.status === 'kritis') {
-                rekomendasi = '🚨 KRITIS! Lakukan shutdown & inspeksi segera!';
-            } else if (d.status === 'peringatan') {
-                if (d.getaran > 5) rekomendasi = '⚠️ Getaran tinggi, periksa bearing & alignment.';
-                else if (d.suhu > 90) rekomendasi = '⚠️ Suhu tinggi, periksa level oli & pendingin.';
-                else if (d.kadar_air > 0.2) rekomendasi = '⚠️ Kadar air tinggi, lakukan purifikasi oli.';
-                else if (d.level_oli < 40) rekomendasi = '⚠️ Level oli rendah, lakukan top-up.';
-                else rekomendasi = '⚠️ Periksa parameter yang menyimpang.';
-            }
-            $('dRekomendasi').textContent = '💡 ' + rekomendasi;
-        }
-
-        // ==========================================
-        //  PROSES DATA
-        // ==========================================
-        function processData(payload) {
-            try {
-                const data = JSON.parse(payload);
-                const deviceId = data.device_id || 'unknown';
-
-                deviceData[deviceId] = {
-                    device_id: deviceId,
-                    device_name: data.device_name || 'Device-' + deviceId,
-                    status: data.status || 'normal',
-                    viskositas: data.viskositas || 0,
-                    suhu: data.suhu || 0,
-                    getaran: data.getaran || 0,
-                    kadar_air: data.kadar_air || 0,
-                    level_oli: data.level_oli || 0,
-                    tekanan_filter: data.tekanan_filter || 0,
-                    timestamp: data.timestamp || Date.now()
-                };
-
-                const primaryDevice = deviceData[1] || Object.values(deviceData)[0];
-                if (primaryDevice) {
-                    updateChart(primaryDevice.viskositas, primaryDevice.suhu);
-                }
-
-                const d = deviceData[deviceId];
-                const now = new Date();
-                const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
-                    now.getMinutes().toString().padStart(2, '0');
-
-                if (d.status === 'kritis') {
-                    alarmLog.unshift({
-                        time: timeStr,
-                        level: 'critical',
-                        message: `🔴 KRITIS: ${d.device_name} - Getaran ${d.getaran.toFixed(2)} mm/s, Suhu ${d.suhu.toFixed(2)}°C`,
-                        device: d.device_name
-                    });
-                } else if (d.status === 'peringatan') {
-                    let msg = `⚠️ Peringatan: ${d.device_name} - `;
-                    if (d.getaran > 5) msg += `Getaran ${d.getaran.toFixed(2)} mm/s`;
-                    else if (d.suhu > 90) msg += `Suhu ${d.suhu.toFixed(2)}°C`;
-                    else if (d.kadar_air > 0.2) msg += `Kadar air ${d.kadar_air.toFixed(2)}%`;
-                    else if (d.level_oli < 40) msg += `Level oli ${d.level_oli.toFixed(2)}%`;
-                    else msg += `Parameter abnormal`;
-                    alarmLog.unshift({ time: timeStr, level: 'warning-item', message: msg, device: d.device_name });
-                }
-
-                // Batasi alarm log (misal max 100)
-                if (alarmLog.length > 100) alarmLog.length = 100;
-
-                renderDevices();
-                renderAlarms();
-                updateKPI();
-
-                const firstDevice = Object.values(deviceData)[0];
-                if (firstDevice && !selectedDeviceId) {
-                    selectDevice(firstDevice.device_id);
-                } else if (selectedDeviceId && deviceData[selectedDeviceId]) {
-                    selectDevice(selectedDeviceId);
-                } else if (firstDevice) {
-                    selectDevice(firstDevice.device_id);
-                }
-
-                $('lastUpdate').textContent = 'Terakhir update: ' + now.toLocaleTimeString('id-ID', { hour12: false });
-
-            } catch (e) {
-                console.warn('Gagal parse data:', e);
-            }
-        }
-
-        // ==========================================
-        //  MQTT KONEKSI
-        // ==========================================
-        function connectMQTT() {
-            mqttStatus.textContent = '⏳ Menghubungkan...';
-            mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
-
-            const client = mqtt.connect(MQTT_BROKER, {
-                clientId: MQTT_CLIENT_ID,
-                clean: true,
-                reconnectPeriod: 3000
-            });
-
-            client.on('connect', () => {
-                console.log('✅ MQTT Terhubung ke test.mosquitto.org!');
-                mqttStatus.textContent = '✅ Terhubung';
-                mqttStatus.className = 'mqtt-status text-[11px] px-[14px] py-1 rounded-[30px] border';
-                client.subscribe(MQTT_TOPIC, (err) => {
-                    if (!err) console.log('📡 Subscribe ke:', MQTT_TOPIC);
-                });
-                client.publish('lubrikasi/status', 'Dashboard online');
-            });
-
-            client.on('message', (topic, message) => {
-                if (topic === MQTT_TOPIC) {
-                    processData(message.toString());
-                }
-            });
-
-            client.on('error', (err) => {
-                console.warn('MQTT Error:', err);
-                mqttStatus.textContent = '❌ Error';
-                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
-            });
-
-            client.on('close', () => {
-                console.warn('MQTT Terputus');
-                mqttStatus.textContent = '⏳ Terputus...';
-                mqttStatus.className = 'mqtt-status disconnected text-[11px] px-[14px] py-1 rounded-[30px] border';
-            });
-        }
-
-        // ==========================================
-        //  GENERATE DATA DUMMY
-        // ==========================================
-        function generateDummyData() {
-            const deviceId = Math.floor(Math.random() * 10) + 1;
-            const names = ['GB-01', 'GB-02', 'GB-03', 'GB-04', 'GB-05', 'GB-06', 'GB-07', 'GB-08', 'GB-09', 'GB-10'];
-
-            const data = {
-                device_id: deviceId,
-                device_name: names[deviceId - 1],
-                timestamp: Date.now(),
-                viskositas: 46 - Math.random() * 8,
-                suhu: 68 + Math.random() * 20,
-                getaran: 2 + Math.random() * 5,
-                kadar_air: 0.02 + Math.random() * 0.25,
-                level_oli: 85 - Math.random() * 25,
-                tekanan_filter: 1.2 + Math.random() * 1.5,
-                status: Math.random() > 0.85 ? 'kritis' : Math.random() > 0.7 ? 'peringatan' : 'normal'
-            };
-
-            processData(JSON.stringify(data));
-        }
-
-        // ==========================================
-        //  INIT
-        // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
             const isLoggedIn = localStorage.getItem('lubricore_logged_in');
             if (isLoggedIn === 'true') {
